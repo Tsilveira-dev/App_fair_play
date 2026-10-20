@@ -4,13 +4,13 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
 const FUNCOES = {
-  config: '/.netlify/functions/config-publica',
+  config: '/.netlify/functions/config-public',
   verificar: '/.netlify/functions/verificar-gestor',
   listar: '/.netlify/functions/listar-participantes',
   salvar: '/.netlify/functions/salvar-participante'
 };
 
-// Preenchido em iniciarSupabase(), a partir da função config-publica.
+// Preenchido em iniciarSupabase(), a partir da função config-public.
 let supabase = null;
 
 /* ---------- Erros ---------- */
