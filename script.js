@@ -95,7 +95,7 @@ async function saudacao(nome) {
 }
 
 /* ---------- Abertura ---------- */
-// 1) transição rápida com o nome da startup
+//  transição rápida com o nome da startup
 [...'Fair Play'].forEach((ch, i) => {
   const l = document.createElement('span');
   l.className = 'brand-letter'; l.style.animationDelay = (0.2 + i * 0.09) + 's';
