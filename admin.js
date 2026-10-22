@@ -1,19 +1,65 @@
 // Fair Play — Painel do gestor (admin.js)
-// Login e sessão pelo Supabase Auth. Os dados são lidos e gravados apenas
-// pelas Netlify Functions, que validam o token do gestor no servidor.
+// Login e sessão: Supabase Auth (URL e chave publicável vêm de config-public).
+// Dados: somente pelas Netlify Functions, que validam o token do gestor no servidor.
+// Este arquivo não acessa tabelas do Supabase diretamente.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
 const FUNCOES = {
   config: '/.netlify/functions/config-public',
   verificar: '/.netlify/functions/verificar-gestor',
   listar: '/.netlify/functions/listar-participantes',
-  salvar: '/.netlify/functions/salvar-participante'
+  salvar: '/.netlify/functions/salvar-participante',
+  acessos: '/.netlify/functions/gerenciar-acesso'
 };
 
-// Preenchido em iniciarSupabase(), a partir da função config-public.
-let supabase = null;
+const FUSO = 'America/Fortaleza';
+const FILTROS_ACESSO = new Set(['pendente', 'aprovada', 'expirada', 'recusada', 'revogada', 'todas']);
+const ROTULOS_STATUS = {
+  pendente: 'Pendente',
+  aprovada: 'Aprovada',
+  expirada: 'Expirada',
+  recusada: 'Recusada',
+  revogada: 'Revogada'
+};
+const ROTULOS_DISPOSITIVO = { individual: 'Individual', compartilhado: 'Compartilhado' };
 
-/* ---------- Erros ---------- */
+const TEXTO_ACOES = {
+  aprovar: {
+    titulo: 'Aprovar acesso',
+    botao: 'Aprovar',
+    estilo: 'btn btn-aprovar btn-pequeno',
+    texto: (nome, fim) => `Autorizar ${nome} a entrar no Fair Play? O acesso vale até ${fim}.`,
+    sucesso: 'Acesso autorizado.'
+  },
+  recusar: {
+    titulo: 'Recusar solicitação',
+    botao: 'Recusar',
+    estilo: 'btn btn-perigo btn-pequeno',
+    texto: nome => `Recusar a solicitação de ${nome}? O registro ficará no histórico e o estudante poderá enviar uma nova solicitação.`,
+    sucesso: 'Solicitação recusada.'
+  },
+  revogar: {
+    titulo: 'Revogar acesso',
+    botao: 'Revogar',
+    estilo: 'btn btn-perigo btn-pequeno',
+    texto: nome => `Encerrar o acesso de ${nome}? O registro será mantido no histórico. Um novo dispositivo só poderá ser liberado depois disso.`,
+    sucesso: 'Acesso revogado.'
+  }
+};
+
+let supabase = null;
+let participantes = [];
+let solicitacoes = [];
+let periodo = { configurado: false, fim: null };
+let acaoPendente = null;
+let operacaoEmAndamento = false;
+let loginEmAndamento = false;
+let seqSolicitacoes = 0;   // número da consulta mais recente de solicitações
+let ocupado = 0;
+let timerStatus = null;
+
+const $ = id => document.getElementById(id);
+
 class ErroSessao extends Error {}
 class ErroServidor extends Error {
   constructor(mensagem, status) {
@@ -22,14 +68,8 @@ class ErroServidor extends Error {
   }
 }
 
-/* ---------- Atalhos de DOM ---------- */
-const $ = id => document.getElementById(id);
+/* ---------- Configuração pública ---------- */
 
-let participantes = [];
-let ocupado = 0;
-let timerStatus = null;
-
-/* ---------- Configuração pública (URL e chave publicável) ---------- */
 async function carregarConfiguracao() {
   const resposta = await fetch(FUNCOES.config, {
     headers: { Accept: 'application/json' },
@@ -52,6 +92,7 @@ async function iniciarSupabase() {
 }
 
 /* ---------- Interface: carregamento, status e erros ---------- */
+
 function carregando(ligado) {
   ocupado = Math.max(0, ocupado + (ligado ? 1 : -1));
   $('overlay-carregando').classList.toggle('oculto', ocupado === 0);
@@ -99,9 +140,19 @@ function mostrarErroLogin(texto) {
   el.classList.remove('oculto');
 }
 
+function formatarDataHora(valor) {
+  if (!valor) return '—';
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return '—';
+  return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: FUSO });
+}
+
 function mostrarLogin() {
+  seqSolicitacoes += 1;   // descarta qualquer consulta de solicitações ainda em andamento
   fecharEdicao();
+  esconderConfirmacao();
   participantes = [];
+  limparSolicitacoes();
   $('tela-admin').classList.add('oculto');
   $('tela-login').classList.remove('oculto');
   $('login-senha').value = '';
@@ -115,19 +166,28 @@ function mostrarAdmin(email) {
   $('admin-usuario').textContent = email ? `Conectado como ${email}` : '';
 }
 
+// Encerra a sessão local sem propagar falhas: o painel precisa voltar ao login mesmo assim.
+async function encerrarSessaoSilenciosa() {
+  try {
+    if (supabase) await supabase.auth.signOut();
+  } catch (e) {
+    // Ignorado de propósito: o token local é tratado pelo próprio cliente.
+  }
+}
+
 async function sessaoExpirada(mensagem) {
-  if (supabase) await supabase.auth.signOut();
+  await encerrarSessaoSilenciosa();
   mostrarLogin();
   mostrarErroLogin(mensagem || 'Sua sessão expirou. Entre novamente.');
 }
 
-function tratarErro(err) {
+async function tratarErro(err) {
   if (err instanceof ErroSessao) {
-    sessaoExpirada(err.message);
+    await sessaoExpirada(err.message);
   } else if (err.status === 401) {
-    sessaoExpirada();
+    await sessaoExpirada();
   } else if (err.status === 403) {
-    sessaoExpirada('Acesso não autorizado.');
+    await sessaoExpirada('Acesso não autorizado.');
   } else {
     mostrarStatus('erro', err.message || 'Algo deu errado. Tente novamente.');
   }
@@ -144,7 +204,7 @@ async function executar(botao, textoOcupado, fn) {
   try {
     await fn();
   } catch (err) {
-    tratarErro(err);
+    await tratarErro(err);
   } finally {
     carregando(false);
     if (botao) {
@@ -155,6 +215,7 @@ async function executar(botao, textoOcupado, fn) {
 }
 
 /* ---------- Comunicação com as Netlify Functions ---------- */
+
 async function obterToken() {
   if (!supabase) throw new ErroSessao('Configuração do sistema ausente. Atualize a página.');
   const { data, error } = await supabase.auth.getSession();
@@ -198,6 +259,7 @@ async function verificarGestor() {
 }
 
 /* ---------- Validação do nome (primeiro nome, somente letras) ---------- */
+
 function validarNome(valor) {
   const nome = valor.trim();
   if (nome.length < 2) return { erro: 'Informe pelo menos 2 letras.' };
@@ -212,26 +274,38 @@ function validarNome(valor) {
 }
 
 /* ---------- Acesso ao painel ---------- */
+
+// Nunca lança exceção: qualquer falha volta para a tela de login com mensagem.
 async function abrirPainel(email) {
   carregando(true);
+  let autorizado = false;
   try {
-    const autorizado = await verificarGestor();
-    if (!autorizado) throw new ErroServidor('Acesso não autorizado.', 403);
+    autorizado = await verificarGestor();
   } catch (err) {
     if (err instanceof ErroSessao || err.status === 401 || err.status === 403) {
-      if (supabase) await supabase.auth.signOut();
+      await encerrarSessaoSilenciosa();
     }
-    carregando(false);
     mostrarLogin();
-    mostrarErroLogin(err.message);
+    mostrarErroLogin(err.message || 'Não foi possível verificar o acesso. Tente novamente.');
+    return;
+  } finally {
+    carregando(false);
+  }
+
+  if (!autorizado) {
+    await encerrarSessaoSilenciosa();
+    mostrarLogin();
+    mostrarErroLogin('Acesso não autorizado.');
     return;
   }
-  carregando(false);
+
   mostrarAdmin(email);
-  await carregarLista();
+  // allSettled: uma falha em participantes não impede o carregamento das solicitações.
+  await Promise.allSettled([carregarLista(), carregarSolicitacoes()]);
 }
 
-/* ---------- Listagem ---------- */
+/* ---------- Participantes: listagem ---------- */
+
 async function carregarLista() {
   const botaoAtualizar = $('btn-atualizar');
   botaoAtualizar.disabled = true;
@@ -241,7 +315,7 @@ async function carregarLista() {
     participantes = Array.isArray(dados.participantes) ? dados.participantes : [];
     renderizarLista();
   } catch (err) {
-    tratarErro(err);
+    await tratarErro(err);
   } finally {
     carregando(false);
     botaoAtualizar.disabled = false;
@@ -265,12 +339,12 @@ function renderizarLista() {
     return;
   }
   msg.classList.add('oculto');
-  participantes.forEach(p => ul.appendChild(criarItem(p)));
+  participantes.forEach(p => ul.appendChild(criarItemParticipante(p)));
 }
 
-function criarItem(p) {
+function criarItemParticipante(p) {
   const li = document.createElement('li');
-  li.className = 'item-participante';
+  li.className = 'item-lista';
   li.dataset.id = p.id;
 
   const info = document.createElement('div');
@@ -287,7 +361,7 @@ function criarItem(p) {
   info.append(nome, badge);
 
   const acoes = document.createElement('div');
-  acoes.className = 'flex gap-2';
+  acoes.className = 'flex flex-wrap gap-2';
 
   const botaoEditar = document.createElement('button');
   botaoEditar.type = 'button';
@@ -308,7 +382,8 @@ function criarItem(p) {
   return li;
 }
 
-/* ---------- Cadastro ---------- */
+/* ---------- Participantes: cadastro ---------- */
+
 $('form-cadastro').addEventListener('submit', async e => {
   e.preventDefault();
   const v = validarNome($('cadastro-nome').value);
@@ -337,7 +412,8 @@ $('form-cadastro').addEventListener('submit', async e => {
 
 $('cadastro-nome').addEventListener('input', () => erroCampo('cadastro-nome', 'cadastro-erro', ''));
 
-/* ---------- Edição do nome ---------- */
+/* ---------- Participantes: edição do nome ---------- */
+
 function abrirEdicao(p) {
   $('editar-id').value = p.id;
   $('editar-nome').value = p.nome;
@@ -380,11 +456,8 @@ $('form-editar').addEventListener('submit', async e => {
   });
 });
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !$('modal-editar').classList.contains('oculto')) fecharEdicao();
-});
+/* ---------- Participantes: ativar / desativar ---------- */
 
-/* ---------- Ativar / desativar ---------- */
 async function alternarAtivo(p, botao) {
   const desativar = p.ativo;
   if (desativar && !confirm(`Desativar ${p.nome}? O cadastro e o histórico serão mantidos.`)) return;
@@ -399,7 +472,6 @@ async function alternarAtivo(p, botao) {
   });
 }
 
-/* Cliques na lista (delegação de eventos, pois os itens são recriados) */
 $('lista-participantes').addEventListener('click', e => {
   const botao = e.target.closest('button[data-acao]');
   if (!botao) return;
@@ -411,7 +483,287 @@ $('lista-participantes').addEventListener('click', e => {
 
 $('btn-atualizar').addEventListener('click', () => carregarLista());
 
+/* ---------- Solicitações de acesso: período do teste ---------- */
+
+// Lê o bloco "periodo" da resposta de gerenciar-acesso.
+function lerPeriodoResposta(p) {
+  if (!p || p.configurado !== true || !p.fim) return { configurado: false, fim: null };
+  const fim = new Date(p.fim);
+  if (Number.isNaN(fim.getTime())) return { configurado: false, fim: null };
+  return { configurado: true, fim };
+}
+
+function periodoPermiteAprovar() {
+  return periodo.configurado && Date.now() < periodo.fim.getTime();
+}
+
+// Retorna o motivo para bloquear Aprovar, ou null se for permitido.
+function motivoBloqueioAprovacao(s) {
+  if (!periodo.configurado) return 'Período do teste não configurado.';
+  if (!periodoPermiteAprovar()) return 'Período do teste encerrado.';
+  if (s.participante_ativo !== true) return 'Participante inativo.';
+  return null;
+}
+
+function atualizarAvisoPeriodo() {
+  const aviso = $('periodo-aviso');
+  let texto = null;
+  if (!periodo.configurado) {
+    texto = 'O período do teste ainda não está configurado. Você pode ver as solicitações, mas nenhuma aprovação será possível até a equipe definir a data oficial.';
+  } else if (!periodoPermiteAprovar()) {
+    texto = 'O período do teste já terminou. Não é possível aprovar novas solicitações.';
+  }
+
+  if (texto) {
+    aviso.textContent = texto;
+    aviso.classList.remove('oculto');
+  } else {
+    aviso.textContent = '';
+    aviso.classList.add('oculto');
+  }
+}
+
+/* ---------- Solicitações de acesso: listagem ---------- */
+
+function limparSolicitacoes() {
+  solicitacoes = [];
+  periodo = { configurado: false, fim: null };
+  $('lista-solicitacoes').textContent = '';
+  $('contador-solicitacoes').textContent = '';
+  $('solicitacoes-mensagem').classList.add('oculto');
+  $('periodo-aviso').classList.add('oculto');
+}
+
+// Cada chamada recebe um número. Só a mais recente pode atualizar a interface,
+// mesmo que respostas anteriores cheguem depois (troca rápida de filtros).
+async function carregarSolicitacoes() {
+  const id = ++seqSolicitacoes;
+
+  const select = $('filtro-solicitacoes').value;
+  const filtro = FILTROS_ACESSO.has(select) ? select : 'pendente';
+  // "Todas" chama o endpoint sem o parâmetro status.
+  const url = filtro === 'todas'
+    ? FUNCOES.acessos
+    : `${FUNCOES.acessos}?status=${encodeURIComponent(filtro)}`;
+
+  const botao = $('btn-atualizar-solicitacoes');
+  botao.disabled = true;
+  carregando(true);
+  try {
+    const dados = await chamar(url);
+    if (id !== seqSolicitacoes) return;   // resposta antiga: descartada
+    solicitacoes = Array.isArray(dados.sessoes) ? dados.sessoes : [];
+    periodo = lerPeriodoResposta(dados.periodo);
+    atualizarAvisoPeriodo();
+    renderizarSolicitacoes();
+  } catch (err) {
+    if (id !== seqSolicitacoes) return;   // erro de consulta antiga: ignorado
+    await tratarErro(err);
+  } finally {
+    carregando(false);
+    if (id === seqSolicitacoes) botao.disabled = false;
+  }
+}
+
+function renderizarSolicitacoes() {
+  const ul = $('lista-solicitacoes');
+  const msg = $('solicitacoes-mensagem');
+  ul.textContent = '';
+
+  const total = solicitacoes.length;
+  $('contador-solicitacoes').textContent = total
+    ? `${total} ${total === 1 ? 'registro' : 'registros'} neste filtro`
+    : '';
+
+  if (!total) {
+    msg.textContent = 'Nenhuma solicitação neste filtro.';
+    msg.classList.remove('oculto');
+    return;
+  }
+  msg.classList.add('oculto');
+  solicitacoes.forEach(s => ul.appendChild(criarItemSolicitacao(s)));
+}
+
+function criarBotaoSolicitacao(texto, classes, acao, sessaoId, desabilitado = false, dica = '') {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = classes;
+  b.dataset.acao = acao;
+  b.dataset.id = sessaoId;
+  b.textContent = texto;
+  b.disabled = desabilitado;
+  if (dica) b.title = dica;
+  return b;
+}
+
+// Exibe o status calculado (status_efetivo), mas decide as ações pelo status gravado.
+function criarItemSolicitacao(s) {
+  const li = document.createElement('li');
+  li.className = 'item-lista';
+  li.dataset.id = s.id;
+
+  const info = document.createElement('div');
+  info.className = 'info-item';
+
+  const linhaTitulo = document.createElement('div');
+  linhaTitulo.className = 'flex flex-wrap items-center gap-2';
+
+  const nome = document.createElement('span');
+  nome.className = 'font-semibold';
+  nome.textContent = s.nome || 'Participante sem nome';
+
+  const efetivo = s.status_efetivo || s.status;
+  const badge = document.createElement('span');
+  badge.className = `badge badge-${efetivo}`;
+  badge.textContent = ROTULOS_STATUS[efetivo] || efetivo;
+
+  linhaTitulo.append(nome, badge);
+  info.appendChild(linhaTitulo);
+
+  const detalhes = [
+    `Dispositivo: ${ROTULOS_DISPOSITIVO[s.tipo_dispositivo] || 'Não informado'}`,
+    `Solicitado em: ${formatarDataHora(s.solicitado_em)}`
+  ];
+  if (efetivo === 'aprovada' && s.expira_em) {
+    detalhes.push(`Válido até: ${formatarDataHora(s.expira_em)}`);
+  }
+  if (efetivo === 'expirada' && s.expira_em) {
+    detalhes.push(`Expirou em: ${formatarDataHora(s.expira_em)}`);
+  }
+  if (s.participante_ativo === false) {
+    detalhes.push('Participante inativo: reative o cadastro antes de aprovar.');
+  }
+
+  detalhes.forEach(texto => {
+    const linha = document.createElement('span');
+    linha.className = 'detalhe';
+    linha.textContent = texto;
+    info.appendChild(linha);
+  });
+
+  const acoes = document.createElement('div');
+  acoes.className = 'flex flex-wrap gap-2';
+
+  if (s.status === 'pendente') {
+    const motivo = motivoBloqueioAprovacao(s);
+    acoes.append(
+      criarBotaoSolicitacao('Aprovar', 'btn btn-aprovar btn-pequeno', 'aprovar', s.id, Boolean(motivo), motivo || ''),
+      criarBotaoSolicitacao('Recusar', 'btn btn-perigo btn-pequeno', 'recusar', s.id)
+    );
+  } else if (s.status === 'aprovada') {
+    acoes.append(criarBotaoSolicitacao('Revogar', 'btn btn-perigo btn-pequeno', 'revogar', s.id));
+  }
+
+  li.append(info, acoes);
+  return li;
+}
+
+/* ---------- Solicitações de acesso: confirmação e decisões ---------- */
+
+function esconderConfirmacao() {
+  acaoPendente = null;
+  $('modal-confirmar').classList.add('oculto');
+  $('confirmar-erro').textContent = '';
+  $('confirmar-erro').classList.add('oculto');
+}
+
+function pedirConfirmacao(acao, s) {
+  const config = TEXTO_ACOES[acao];
+  const nome = s.nome || 'este participante';
+  const fim = periodo.fim ? formatarDataHora(periodo.fim) : '';
+
+  acaoPendente = { acao, sessaoId: s.id };
+  $('confirmar-titulo').textContent = config.titulo;
+  $('confirmar-texto').textContent = config.texto(nome, fim);
+
+  const botao = $('btn-confirmar-acao');
+  botao.textContent = config.botao;
+  botao.className = config.estilo;
+  botao.style.width = 'auto';
+
+  $('confirmar-erro').textContent = '';
+  $('confirmar-erro').classList.add('oculto');
+  $('modal-confirmar').classList.remove('oculto');
+  $('btn-confirmar-cancelar').focus();
+}
+
+async function executarConfirmacao() {
+  if (!acaoPendente || operacaoEmAndamento) return;
+
+  const { acao, sessaoId } = acaoPendente;
+  const botao = $('btn-confirmar-acao');
+  const cancelar = $('btn-confirmar-cancelar');
+  const textoOriginal = botao.textContent;
+
+  operacaoEmAndamento = true;
+  botao.disabled = true;
+  cancelar.disabled = true;
+  botao.textContent = 'Aguarde...';
+  carregando(true);
+
+  let recarregarLista = false;
+  try {
+    const dados = await chamar(FUNCOES.acessos, {
+      metodo: 'POST',
+      corpo: { acao, sessao_id: sessaoId }
+    });
+    esconderConfirmacao();
+    mostrarStatus('sucesso', dados.mensagem || TEXTO_ACOES[acao].sucesso);
+    recarregarLista = true;
+  } catch (err) {
+    if (err.status === 0) {
+      // Sem conexão: mantém o modal aberto para nova tentativa.
+      $('confirmar-erro').textContent = err.message;
+      $('confirmar-erro').classList.remove('oculto');
+    } else {
+      esconderConfirmacao();
+      await tratarErro(err);
+      // Erros de decisão (409, 404, 400) exigem atualizar a lista com o estado real.
+      recarregarLista = !(err instanceof ErroSessao || err.status === 401 || err.status === 403);
+    }
+  } finally {
+    carregando(false);
+    operacaoEmAndamento = false;
+    botao.disabled = false;
+    cancelar.disabled = false;
+    botao.textContent = textoOriginal;
+  }
+
+  if (recarregarLista) await carregarSolicitacoes();
+}
+
+$('lista-solicitacoes').addEventListener('click', e => {
+  const botao = e.target.closest('button[data-acao]');
+  if (!botao || operacaoEmAndamento || botao.disabled) return;
+
+  const s = solicitacoes.find(x => x.id === botao.dataset.id);
+  if (!s) return;
+
+  const acao = botao.dataset.acao;
+  if (!TEXTO_ACOES[acao]) return;
+  pedirConfirmacao(acao, s);
+});
+
+$('btn-confirmar-cancelar').addEventListener('click', () => {
+  if (!operacaoEmAndamento) esconderConfirmacao();
+});
+$('btn-confirmar-acao').addEventListener('click', () => executarConfirmacao());
+$('filtro-solicitacoes').addEventListener('change', () => carregarSolicitacoes());
+$('btn-atualizar-solicitacoes').addEventListener('click', () => carregarSolicitacoes());
+
+/* ---------- Teclado ---------- */
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('modal-confirmar').classList.contains('oculto')) {
+    if (!operacaoEmAndamento) esconderConfirmacao();
+    return;
+  }
+  if (!$('modal-editar').classList.contains('oculto')) fecharEdicao();
+});
+
 /* ---------- Login e logout ---------- */
+
 $('form-login').addEventListener('submit', async e => {
   e.preventDefault();
   mostrarErroLogin('');
@@ -426,37 +778,46 @@ $('form-login').addEventListener('submit', async e => {
     mostrarErroLogin('Configuração do sistema ausente. Atualize a página.');
     return;
   }
+  if (loginEmAndamento) return;
 
   const botao = $('btn-login');
+  let sessao = null;
+
+  loginEmAndamento = true;
   botao.disabled = true;
   botao.textContent = 'Entrando...';
   carregando(true);
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
 
-  carregando(false);
-  botao.disabled = false;
-  botao.textContent = 'Entrar';
-
-  if (error || !data.session) {
-    if (error && !error.status) {
-      mostrarErroLogin('Não foi possível conectar. Verifique sua internet e tente novamente.');
-    } else {
-      mostrarErroLogin('E-mail ou senha inválidos.');
-      $('login-senha').value = '';
+    if (error || !data || !data.session) {
+      if (error && !error.status) {
+        mostrarErroLogin('Não foi possível conectar. Verifique sua internet e tente novamente.');
+      } else {
+        mostrarErroLogin('E-mail ou senha inválidos.');
+        $('login-senha').value = '';
+      }
+      return;
     }
+    sessao = data.session;
+  } catch (err) {
+    mostrarErroLogin('Não foi possível concluir o login. Verifique sua conexão e tente novamente.');
     return;
+  } finally {
+    carregando(false);
+    botao.disabled = false;
+    botao.textContent = 'Entrar';
+    loginEmAndamento = false;
   }
 
-  await abrirPainel(data.session.user.email);
+  await abrirPainel(sessao.user.email);
 });
 
 $('btn-sair').addEventListener('click', async () => {
   carregando(true);
   try {
-    if (supabase) await supabase.auth.signOut();
-  } catch (e) {
-    // Mesmo que a chamada falhe, a tela de login é exibida e o token local é limpo.
+    await encerrarSessaoSilenciosa();
   } finally {
     carregando(false);
   }
@@ -464,26 +825,36 @@ $('btn-sair').addEventListener('click', async () => {
 });
 
 /* ---------- Inicialização ---------- */
-async function iniciar() {
-  try {
-    await iniciarSupabase();
-  } catch (err) {
-    $('btn-login').disabled = true;
-    mostrarErroLogin('Não foi possível carregar a configuração. Atualize a página e tente novamente.');
-    return;
-  }
 
+// Nenhuma falha aqui deve deixar o painel travado com o contador de carregamento ligado.
+async function iniciar() {
   carregando(true);
   try {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      mostrarLogin();
+    try {
+      await iniciarSupabase();
+    } catch (err) {
+      $('btn-login').disabled = true;
+      mostrarErroLogin('Não foi possível carregar a configuração. Atualize a página e tente novamente.');
       return;
     }
-    await abrirPainel(data.session.user.email);
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data || !data.session) {
+        mostrarLogin();
+        return;
+      }
+      await abrirPainel(data.session.user.email);
+    } catch (err) {
+      mostrarLogin();
+      mostrarErroLogin('Não foi possível verificar sua sessão. Entre novamente.');
+    }
   } finally {
     carregando(false);
   }
 }
 
-iniciar();
+iniciar().catch(() => {
+  carregando(false);
+  mostrarErroLogin('Ocorreu um erro inesperado. Atualize a página.');
+});

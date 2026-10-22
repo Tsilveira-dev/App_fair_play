@@ -33,6 +33,8 @@
       --line: #E5E7EB;
       --erro: #B91C1C;
       --erro-fundo: #FEF2F2;
+      --aviso: #92400E;
+      --aviso-fundo: #FFFBEB;
     }
     body {
       font-family: 'Nunito Sans', system-ui, sans-serif;
@@ -90,10 +92,12 @@
     .btn-ghost:hover:not(:disabled) { box-shadow: none; border-color: var(--brand); transform: none; }
     .btn-pequeno { padding: 0.5rem 0.9rem; font-size: 0.8rem; border-radius: 0.75rem; }
     .btn-perigo { background: #fff; color: var(--erro); border-color: #FECACA; }
+    .btn-perigo:hover:not(:disabled) { box-shadow: none; transform: none; border-color: var(--erro); }
+    .btn-aprovar { background: var(--go); color: #fff; }
     .btn-header { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.3); }
     .btn-header:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); box-shadow: none; transform: none; }
 
-    /* Overlay e modal */
+    /* Overlay e modais */
     .camada {
       position: fixed;
       inset: 0;
@@ -107,8 +111,8 @@
     .camada-carregando { z-index: 50; }
     .camada-modal { z-index: 40; }
 
-    /* Lista */
-    .item-participante {
+    /* Listas */
+    .item-lista {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -116,22 +120,33 @@
       gap: 0.75rem;
       padding: 1rem 0;
     }
-    .item-participante + .item-participante { border-top: 1px solid var(--line); }
+    .item-lista + .item-lista { border-top: 1px solid var(--line); }
+    .info-item { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+    .detalhe { font-size: 0.8rem; color: #6B7280; }
+
+    /* Badges de status */
     .badge {
       display: inline-block;
       border-radius: 999px;
       padding: 0.2rem 0.7rem;
       font-size: 0.75rem;
       font-weight: 700;
+      white-space: nowrap;
     }
     .badge-ativo { background: rgba(34, 197, 94, 0.15); color: #15803D; }
     .badge-inativo { background: #F3F4F6; color: #6B7280; }
+    .badge-pendente { background: rgba(250, 204, 21, 0.25); color: #854D0E; }
+    .badge-aprovada { background: rgba(34, 197, 94, 0.15); color: #15803D; }
+    .badge-expirada { background: #FFEDD5; color: #9A3412; }
+    .badge-recusada { background: #FEE2E2; color: #991B1B; }
+    .badge-revogada { background: #E5E7EB; color: #374151; }
 
-    /* Mensagens de status */
+    /* Mensagens */
     .status { border-radius: 1rem; padding: 0.85rem 1.1rem; font-size: 0.92rem; font-weight: 700; }
     .status-sucesso { background: rgba(34, 197, 94, 0.12); color: #15803D; }
     .status-erro { background: var(--erro-fundo); color: var(--erro); }
     .status-info { background: rgba(17, 17, 156, 0.07); color: var(--brand); }
+    .status-aviso { background: var(--aviso-fundo); color: var(--aviso); }
 
     .texto-erro { margin-top: 0.4rem; font-size: 0.875rem; color: var(--erro); }
     .spinner {
@@ -205,6 +220,9 @@
       <!-- Mensagem global de status -->
       <div id="status-global" class="status oculto" role="status" aria-live="polite"></div>
 
+      <!-- Aviso de período do teste (mostrado pelo admin.js quando não configurado) -->
+      <div id="periodo-aviso" class="status status-aviso oculto" role="status"></div>
+
       <div class="grid gap-6 lg:grid-cols-3">
 
         <!-- Cadastro -->
@@ -238,6 +256,35 @@
           <ul id="lista-participantes" class="mt-4"></ul>
         </section>
       </div>
+
+      <!-- Solicitações de acesso -->
+      <section class="cartao p-6" aria-labelledby="titulo-solicitacoes">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 id="titulo-solicitacoes" class="font-display text-lg font-bold">Solicitações de acesso</h2>
+            <p id="contador-solicitacoes" class="text-sm text-slate-500"></p>
+          </div>
+          <div class="flex flex-wrap items-end gap-3">
+            <div>
+              <label for="filtro-solicitacoes" class="mb-1 block text-sm font-semibold">Mostrar</label>
+              <select id="filtro-solicitacoes" class="campo py-2 pr-8 text-sm">
+                <option value="pendente" selected>Pendentes</option>
+                <option value="aprovada">Aprovadas</option>
+                <option value="expirada">Expiradas</option>
+                <option value="recusada">Recusadas</option>
+                <option value="revogada">Revogadas</option>
+                <option value="todas">Todas</option>
+              </select>
+            </div>
+            <button id="btn-atualizar-solicitacoes" type="button" class="btn btn-ghost btn-pequeno">Atualizar</button>
+          </div>
+        </div>
+
+        <p id="solicitacoes-mensagem" class="mt-4 text-sm text-slate-500 oculto"></p>
+
+        <!-- Os itens são gerados pelo admin.js -->
+        <ul id="lista-solicitacoes" class="mt-4"></ul>
+      </section>
     </main>
   </section>
 
@@ -260,6 +307,19 @@
     </div>
   </div>
 
+  <!-- Modal de confirmação (aprovar, recusar, revogar) -->
+  <div id="modal-confirmar" class="camada camada-modal oculto" role="dialog" aria-modal="true" aria-labelledby="confirmar-titulo">
+    <div class="cartao w-full max-w-md p-6">
+      <h2 id="confirmar-titulo" class="font-display text-lg font-bold"></h2>
+      <p id="confirmar-texto" class="mt-3 text-sm text-slate-600"></p>
+      <p id="confirmar-erro" class="texto-erro oculto" role="alert"></p>
+      <div class="mt-6 flex justify-end gap-3">
+        <button id="btn-confirmar-cancelar" type="button" class="btn btn-ghost btn-pequeno">Cancelar</button>
+        <button id="btn-confirmar-acao" type="button" class="btn btn-brand btn-pequeno" style="width:auto">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="admin.js"></script>
 </body>
-</html>  
+</html>
