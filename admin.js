@@ -21,7 +21,6 @@ const ROTULOS_STATUS = {
   recusada: 'Recusada',
   revogada: 'Revogada'
 };
-const ROTULOS_DISPOSITIVO = { individual: 'Individual', compartilhado: 'Compartilhado' };
 
 const TEXTO_ACOES = {
   aprovar: {
@@ -66,6 +65,16 @@ class ErroServidor extends Error {
     super(mensagem);
     this.status = status;
   }
+}
+
+/* ---------- Textos dinâmicos ---------- */
+
+// Singular somente quando o valor for exatamente 1.
+function textoContador(total, ativos) {
+  const cadastro = total === 1 ? 'cadastrado' : 'cadastrados';
+  const ativo = ativos === 1 ? 'ativo' : 'ativos';
+
+  return `${total} ${cadastro} · ${ativos} ${ativo}`;
 }
 
 /* ---------- Configuração pública ---------- */
@@ -152,6 +161,9 @@ function mostrarLogin() {
   fecharEdicao();
   esconderConfirmacao();
   participantes = [];
+  $('lista-participantes').textContent = '';
+  $('contador-participantes').textContent = '';
+  $('lista-mensagem').classList.add('oculto');
   limparSolicitacoes();
   $('tela-admin').classList.add('oculto');
   $('tela-login').classList.remove('oculto');
@@ -328,10 +340,8 @@ function renderizarLista() {
   ul.textContent = '';
 
   const total = participantes.length;
-  const ativos = participantes.filter(p => p.ativo).length;
-  $('contador-participantes').textContent = total
-    ? `${total} cadastrado(s) · ${ativos} ativo(s)`
-    : '';
+  const ativos = participantes.filter(p => p.ativo === true).length;
+  $('contador-participantes').textContent = textoContador(total, ativos);
 
   if (!total) {
     msg.textContent = 'Nenhum participante cadastrado ainda.';
@@ -597,6 +607,7 @@ function criarBotaoSolicitacao(texto, classes, acao, sessaoId, desabilitado = fa
 }
 
 // Exibe o status calculado (status_efetivo), mas decide as ações pelo status gravado.
+// O tipo de aparelho não é exibido: o valor enviado pelo app é apenas um padrão técnico.
 function criarItemSolicitacao(s) {
   const li = document.createElement('li');
   li.className = 'item-lista';
@@ -620,10 +631,7 @@ function criarItemSolicitacao(s) {
   linhaTitulo.append(nome, badge);
   info.appendChild(linhaTitulo);
 
-  const detalhes = [
-    `Dispositivo: ${ROTULOS_DISPOSITIVO[s.tipo_dispositivo] || 'Não informado'}`,
-    `Solicitado em: ${formatarDataHora(s.solicitado_em)}`
-  ];
+  const detalhes = [`Solicitado em: ${formatarDataHora(s.solicitado_em)}`];
   if (efetivo === 'aprovada' && s.expira_em) {
     detalhes.push(`Válido até: ${formatarDataHora(s.expira_em)}`);
   }

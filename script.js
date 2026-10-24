@@ -18,7 +18,8 @@ const PREFIXO_ESTADO = 'fairplay-v5:';
 const INTERVALO_VERIFICACAO_MS = 30000;
 const FUSO = 'America/Fortaleza';
 const DIAS_DO_TESTE = 7;
-const TIPOS_APARELHO = new Set(['individual', 'compartilhado']);
+// Valor técnico padrão exigido pelo servidor. Não é informação comprovada sobre o aparelho do estudante.
+const TIPO_DISPOSITIVO_PADRAO = 'individual';
 const ICONES_MENU = { home: '🏠', checkin: '📝', challenge: '🎯', progress: '📊' };
 
 const MSG_SEM_REGISTRO = 'Ainda não há uma solicitação registrada para este nome. Confira o nome com a equipe e tente novamente. Se você já enviou uma solicitação antes, procure o gestor.';
@@ -28,14 +29,18 @@ const MSG_DIA8 = 'No Dia 8 não é possível iniciar novos desafios. Você pode 
 const MSG_UM_POR_DIA = 'Você já tem um desafio registrado para este dia do teste. Só é possível um desafio por dia.';
 const MSG_SEM_CONFIRMACAO = 'Sem confirmação do servidor agora. Seus dados continuam salvos neste aparelho. Check-ins, desafios aceitos e conclusões serão liberados quando a conexão for confirmada.';
 const MSG_TEMPO_AGUARDANDO = 'O tempo terminou. Toque em CONCLUIR quando a conexão for confirmada.';
+const MSG_ESPERA_FALHA = 'Não foi possível confirmar agora. Tentaremos novamente.';
 const TITULOS_BLOQUEIO = {
   recusada: 'Solicitação não aceita',
   revogada: 'Acesso encerrado',
   expirada: 'Acesso expirado',
-  participante_inativo: 'Cadastro indisponível',
   periodo_nao_configurado: 'Período ainda não definido',
   periodo_encerrado: 'Período encerrado',
   erro_interno: 'Acesso indisponível'
+};
+const BLOQUEIO_PARTICIPANTE_INATIVO = {
+  titulo: 'Seu acesso está temporariamente indisponível',
+  texto: 'No momento, sua participação no Fair Play não está habilitada. Caso precise de ajuda, converse com a equipe responsável.'
 };
 
 const DAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
@@ -286,10 +291,11 @@ function mostrarFormulario(mensagem = '') {
   $('nameSubmit').disabled = enviando || !supa;
 }
 
+// O texto acolhedor da espera fica no HTML. Aqui só o nome e um aviso técnico, se houver.
 function mostrarEspera(nome, aviso = '') {
   mostrarTela('espera');
   $('esperaNome').textContent = nome || '';
-  $('esperaTexto').textContent = aviso || 'Aguarde a equipe liberar seu acesso. Esta tela será atualizada sozinha.';
+  if (aviso) $('esperaUltima').textContent = aviso;
   ativarVerificacao();
 }
 
@@ -478,11 +484,11 @@ function tratarFalhaVerificacao(err, { silencioso }) {
   const mensagem = err.message || 'Não foi possível verificar seu acesso agora.';
 
   if (telaAtual === 'formulario' && solicitacaoEnviada) {
-    mostrarEspera(ultimoNomeEnviado, 'Solicitação enviada. Não foi possível confirmar agora; tentaremos novamente.');
+    mostrarEspera(ultimoNomeEnviado, MSG_ESPERA_FALHA);
     return;
   }
   if (telaAtual === 'espera') {
-    $('esperaUltima').textContent = `${mensagem} Tentaremos novamente.`;
+    $('esperaUltima').textContent = `${mensagem} ${MSG_ESPERA_FALHA}`;
     return;
   }
   if (telaAtual === 'app') {
@@ -510,6 +516,11 @@ function aplicarAcesso(dados, { aposEnvio = false } = {}) {
 
   if (dados.motivo === 'sem_solicitacao') {
     mostrarFormulario(aposEnvio ? MSG_SEM_REGISTRO : '');
+    return;
+  }
+
+  if (dados.motivo === 'participante_inativo') {
+    mostrarBloqueio(BLOQUEIO_PARTICIPANTE_INATIVO.titulo, BLOQUEIO_PARTICIPANTE_INATIVO.texto);
     return;
   }
 
@@ -652,7 +663,7 @@ function mensagemErroSolicitacao(resposta) {
     );
   }
   if (resposta.status === 400) {
-    return new ErroFluxo('Confira o primeiro nome (somente letras) e o tipo de aparelho.', 'validacao', 400);
+    return new ErroFluxo('Confira o primeiro nome (somente letras) e tente novamente.', 'validacao', 400);
   }
   if (resposta.status === 401 || resposta.status === 403) {
     return new ErroFluxo('Não foi possível confirmar sua sessão. Tente novamente.', 'sessao', resposta.status);
@@ -678,21 +689,14 @@ async function enviarSolicitacao() {
   if (enviando) return;
 
   const nome = $('nameInput').value.trim();
-  const escolha = document.querySelector('input[name="tipo_dispositivo"]:checked');
-  const tipo = escolha ? escolha.value : '';
 
   $('nameErr').textContent = '';
-  $('deviceErr').textContent = '';
   $('formAviso').textContent = '';
 
   const erroNome = validarNomeEstudante(nome);
   if (erroNome) {
     $('nameErr').textContent = erroNome;
     $('nameInput').focus();
-    return;
-  }
-  if (!TIPOS_APARELHO.has(tipo)) {
-    $('deviceErr').textContent = 'Escolha se o aparelho é individual ou compartilhado.';
     return;
   }
   if (!supa) {
@@ -717,7 +721,7 @@ async function enviarSolicitacao() {
 
     const resposta = await postServidor(FUNCOES.solicitar, {
       token: sessao.access_token,
-      corpo: { nome, tipo_dispositivo: tipo }
+      corpo: { nome, tipo_dispositivo: TIPO_DISPOSITIVO_PADRAO }
     });
     if (resposta.status !== 202) throw mensagemErroSolicitacao(resposta);
 
@@ -1222,14 +1226,6 @@ function pctDia(n) {
   return 0;
 }
 
-// Substitui somente o texto fixo de regra da tela de progresso (index.html não é alterado).
-function ajustarRegraProgresso() {
-  const paragrafo = $$('#progress p').find(p => p.textContent.trim().startsWith('Cada dia vale'));
-  if (paragrafo) {
-    paragrafo.textContent = 'Cada dia do teste permite um único desafio. Desafio em andamento vale 30%; desafio concluído vale 100%. O dia de hoje fica em destaque.';
-  }
-}
-
 function renderProgress() {
   const e = estatisticas();
   $('stPts').textContent = e.pontos;
@@ -1300,9 +1296,6 @@ $('bloqueioVerificar').addEventListener('click', async () => {
 /* ---------- Formulário de entrada ---------- */
 
 $('nameInput').addEventListener('input', () => { $('nameErr').textContent = ''; });
-document.querySelectorAll('input[name="tipo_dispositivo"]').forEach(radio => {
-  radio.addEventListener('change', () => { $('deviceErr').textContent = ''; });
-});
 $('nameStep').addEventListener('submit', e => {
   e.preventDefault();
   enviarSolicitacao();
@@ -1321,7 +1314,6 @@ async function iniciar() {
   construirMarca();
   aplicarIconesMenu();
   criarNotaProgresso();
-  ajustarRegraProgresso();
   mostrarTela('marca');
   mostrarPassoIntro('marca');
 
