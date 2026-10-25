@@ -2,21 +2,20 @@
 /*
  * FAIR PLAY — SCRIPT DO ESTUDANTE
  * Ambiente: TESTE
- * Catálogo: rascunho 2026.1
+ * Questionário: 7 dias, 5 perguntas por dia.
+ * Catálogo: rascunho 2026.1.
  *
- * 7 dias, 5 perguntas por dia.
- *
- * A autenticação utiliza Supabase Auth anônimo.
- * A autorização utiliza Netlify Functions.
- *
- * Atenção: check-ins e desafios ainda são
- * armazenados localmente no navegador.
+ * Auth: Supabase.
+ * Autorização: Netlify Functions.
+ * Check-ins: Supabase.
+ * Desafios: armazenamento local temporário.
  */
 
 const FUNCOES = {
   config: '/.netlify/functions/config-public',
   solicitar: '/.netlify/functions/solicitar-acesso',
-  consultar: '/.netlify/functions/consultar-acesso'
+  consultar: '/.netlify/functions/consultar-acesso',
+  checkin: '/.netlify/functions/checkin'
 };
 
 const SUPABASE_ESM =
@@ -45,10 +44,7 @@ const MSG_UM_POR_DIA =
   'Você já tem um desafio registrado para este dia do teste. Só é possível um desafio por dia.';
 
 const MSG_SEM_CONFIRMACAO =
-  'Sem confirmação do servidor agora. Seus dados continuam salvos neste aparelho. Check-ins, desafios aceitos e conclusões serão liberados quando a conexão for confirmada.';
-
-const MSG_TEMPO_AGUARDANDO =
-  'O tempo terminou. Toque em CONCLUIR quando a conexão for confirmada.';
+  'Sem confirmação do servidor agora. Novos registros serão liberados quando a conexão for confirmada.';
 
 const MSG_ESPERA_FALHA =
   'Não foi possível confirmar agora. Tentaremos novamente.';
@@ -64,25 +60,21 @@ const TITULOS_BLOQUEIO = {
 
 const BLOQUEIO_PARTICIPANTE_INATIVO = {
   titulo: 'Seu acesso está temporariamente indisponível',
-  texto:
-    'No momento, sua participação no Fair Play não está habilitada. Caso precise de ajuda, converse com a equipe responsável.'
+  texto: 'No momento, sua participação no Fair Play não está habilitada. Caso precise de ajuda, converse com a equipe responsável.'
 };
 
 /*
- * CATÁLOGO ORIGINAL DE 35 PERGUNTAS
+ * QUESTIONÁRIO ORIGINAL
  *
- * Transcrição do rascunho 2026.1.
- *
- * Cada alternativa possui um dos códigos:
- * 0, 1, 2 = resposta pontuável.
+ * 0, 1, 2 = pontuação educativa.
  * "i" = resposta informativa.
- * "n" = resposta não aplicável.
+ * "n" = não aplicável.
  *
- * As pontuações são educativas e provisórias.
+ * A ordem deve coincidir com checkin.mjs.
  */
 
 const DADOS_QUESTIONARIO = [
-  // DIA 1 — Tempo de jogo e rotina
+  // DIA 1
   [
     [
       "Quanto tempo você jogou hoje?",
@@ -130,7 +122,7 @@ const DADOS_QUESTIONARIO = [
     ]
   ],
 
-  // DIA 2 — Estudos e responsabilidades
+  // DIA 2
   [
     [
       "Você deixou alguma tarefa para depois porque queria jogar?",
@@ -179,7 +171,7 @@ const DADOS_QUESTIONARIO = [
     ]
   ],
 
-  // DIA 3 — Sono e descanso
+  // DIA 3
   [
     [
       "Você ficou jogando até mais tarde do que deveria?",
@@ -226,7 +218,7 @@ const DADOS_QUESTIONARIO = [
     ]
   ],
 
-  // DIA 4 — Pausas e autocontrole
+  // DIA 4
   [
     [
       "Você conseguiu fazer pausas enquanto jogava hoje?",
@@ -275,7 +267,7 @@ const DADOS_QUESTIONARIO = [
     ]
   ],
 
-  // DIA 5 — Lazer e atividades fora das telas
+  // DIA 5
   [
     [
       "Além de jogar, você fez alguma outra atividade divertida hoje?",
@@ -323,7 +315,7 @@ const DADOS_QUESTIONARIO = [
     ]
   ],
 
-  // DIA 6 — Emoções e hábitos
+  // DIA 6
   [
     [
       "Como você se sente quando está jogando?",
@@ -372,7 +364,7 @@ const DADOS_QUESTIONARIO = [
     ]
   ],
 
-  // DIA 7 — Organização e equilíbrio
+  // DIA 7
   [
     [
       "Você conseguiu equilibrar o tempo de jogo com suas outras atividades?",
@@ -422,28 +414,26 @@ const DADOS_QUESTIONARIO = [
   ]
 ];
 
-/*
- * Transforma o catálogo em objetos com IDs estáveis.
- */
 const PERGUNTAS_POR_DIA = DADOS_QUESTIONARIO.map(
-  (lista, indiceDia) =>
-    lista.map(([texto, alternativas], indicePergunta) => {
+  (lista, dia) =>
+    lista.map(([texto, alternativas], indice) => {
       const id =
-        `D${String(indiceDia + 1).padStart(2, '0')}_P${indicePergunta + 1}`;
+        `D${String(dia + 1).padStart(2, '0')}_P${indice + 1}`;
 
       return {
         id,
         q: texto,
-        o: alternativas.map(([rotulo, codigo], indiceAlternativa) => ({
-          id: `${id}_A${indiceAlternativa + 1}`,
+        o: alternativas.map(([rotulo, codigo], j) => ({
+          id: `${id}_A${j + 1}`,
           texto: rotulo,
-          tipo:
-            typeof codigo === 'number'
-              ? 'pontuavel'
-              : codigo === 'i'
-                ? 'informativa'
-                : 'nao_aplicavel',
-          valor: typeof codigo === 'number' ? codigo : null
+          tipo: typeof codigo === 'number'
+            ? 'pontuavel'
+            : codigo === 'i'
+              ? 'informativa'
+              : 'nao_aplicavel',
+          valor: typeof codigo === 'number'
+            ? codigo
+            : null
         }))
       };
     })
@@ -453,71 +443,37 @@ function perguntasDoDia(dia) {
   return PERGUNTAS_POR_DIA[Number(dia) - 1] || [];
 }
 
-/*
- * RESULTADOS EDUCATIVOS
- */
 const RESULTS = {
   baixo: {
-    n: 1,
     label: 'Baixo',
-    emoji: '🟢',
-    color: '#22C55E',
     title: 'Bom equilíbrio nos seus hábitos',
-    text:
-      'Suas respostas mostram uma boa relação entre jogos e outras atividades. Continue observando sua rotina para manter esse equilíbrio.',
-    rec:
-      'Mantenha o que já funciona: combine horários de jogo com estudos, descanso e tempo com a família.',
+    text: 'Suas respostas mostram uma boa relação entre jogos e outras atividades. Continue observando sua rotina para manter esse equilíbrio.',
+    rec: 'Mantenha o que já funciona: combine horários de jogo com estudos, descanso e tempo com a família.',
     tip: null
   },
-
   mod: {
-    n: 2,
     label: 'Moderado',
-    emoji: '🟡',
-    color: '#FACC15',
     title: 'Atenção aos seus hábitos',
-    text:
-      'Algumas das suas respostas indicam que pode ser interessante observar melhor seu tempo de jogo e buscar um equilíbrio maior com outras atividades.',
-    rec:
-      'Experimente estabelecer um período para estudar ou realizar outra atividade antes de começar a jogar.',
-    tip:
-      'Combine com sua família um horário fixo para jogar e outro para estudar. Ter horários definidos ajuda a respeitar os limites.'
+    text: 'Algumas das suas respostas indicam que pode ser interessante observar melhor seu tempo de jogo e buscar um equilíbrio maior com outras atividades.',
+    rec: 'Experimente estabelecer um período para estudar ou realizar outra atividade antes de começar a jogar.',
+    tip: 'Combine com sua família um horário fixo para jogar e outro para estudar. Ter horários definidos ajuda a respeitar os limites.'
   },
-
   alto: {
-    n: 3,
     label: 'Alto',
-    emoji: '🟠',
-    color: '#F97316',
     title: 'Hora de ajustar a rotina',
-    text:
-      'Suas respostas sugerem que os jogos podem estar ocupando bastante espaço no seu dia. Pequenos passos podem ajudar a reorganizar a rotina.',
-    rec:
-      'Converse com alguém de confiança e combine pausas entre as partidas, começando por uma atividade fora das telas.',
-    tip:
-      'Prefira partidas curtas. Ao terminar cada uma, levante, beba água e faça uma pausa antes de começar outra.'
+    text: 'Suas respostas sugerem que os jogos podem estar ocupando bastante espaço no seu dia. Pequenos passos podem ajudar a reorganizar a rotina.',
+    rec: 'Converse com alguém de confiança e combine pausas entre as partidas, começando por uma atividade fora das telas.',
+    tip: 'Prefira partidas curtas. Ao terminar cada uma, levante, beba água e faça uma pausa antes de começar outra.'
   },
-
   neutro: {
-    n: 0,
     label: 'Sem classificação',
-    emoji: '',
-    color: '#64748b',
     title: 'Obrigado por participar',
-    text:
-      'Você respondeu às cinco perguntas. Nem todas se aplicavam à sua rotina, então não há classificação neste dia.',
-    rec:
-      'Continue acompanhando seus hábitos e organizando tempo para descanso, estudos e lazer.',
+    text: 'Você respondeu às cinco perguntas. Nem todas se aplicavam à sua rotina, então não há classificação neste dia.',
+    rec: 'Continue acompanhando seus hábitos e organizando tempo para descanso, estudos e lazer.',
     tip: null
   }
 };
 
-/*
- * ATIVIDADES E DESAFIOS
- *
- * Esta parte preserva os desafios do script recebido.
- * A revisão completa dos 21 desafios fica para outra etapa.
- */
 const ACT = {
   study: ' Estudar ',
   sport: ' Fazer atividade física ',
@@ -527,44 +483,42 @@ const ACT = {
   rest: ' Descansar '
 };
 
+/*
+ * Desafios antigos preservados.
+ * Ainda falta a integração definitiva
+ * dos 21 desafios e da pontuação planejada.
+ */
 const CH = {
   baixo: {
     tag: 'Missão de manutenção',
     title: '20 minutos de pausa ativa',
     min: 20,
     pts: 30,
-    text:
-      'Seu equilíbrio está bom! Para mantê-lo, depois de uma sessão de jogo faça uma pausa de 20 minutos com uma atividade fora das telas.',
+    text: 'Seu equilíbrio está bom! Para mantê-lo, depois de uma sessão de jogo faça uma pausa de 20 minutos com uma atividade fora das telas.',
     list: ['sport', 'read', 'draw', 'family', 'rest']
   },
-
   mod: {
     tag: 'Missão de organização da rotina',
     title: '30 minutos antes do jogo',
     min: 30,
     pts: 50,
-    text:
-      'Antes de iniciar sua próxima sessão de jogo, escolha uma atividade fora das telas durante 30 minutos e organize o horário do seu dia.',
+    text: 'Antes de iniciar sua próxima sessão de jogo, escolha uma atividade fora das telas durante 30 minutos e organize o horário do seu dia.',
     list: ['study', 'sport', 'draw', 'read', 'family']
   },
-
   alto: {
     tag: 'Missão Offline',
     title: '45 minutos sem telas',
     min: 45,
     pts: 70,
-    text:
-      'Reduza o tempo de tela hoje: fique 45 minutos sem telas antes de jogar de novo. Comece por algo de que você goste.',
+    text: 'Reduza o tempo de tela hoje: fique 45 minutos sem telas antes de jogar de novo. Comece por algo de que você goste.',
     list: ['study', 'sport', 'draw', 'read', 'family']
   },
-
   neutro: {
     tag: 'Atividade de bem-estar',
     title: 'Uma pausa para fazer o que gosta',
     min: 20,
     pts: 20,
-    text:
-      'Faça uma pequena atividade fora das telas, no seu ritmo. O cronômetro é apenas um apoio opcional.',
+    text: 'Faça uma pequena atividade fora das telas, no seu ritmo. O cronômetro é apenas um apoio opcional.',
     list: ['read', 'draw', 'family', 'rest']
   }
 };
@@ -575,9 +529,6 @@ const $ = id => document.getElementById(id);
 const $$ = seletor => [...document.querySelectorAll(seletor)];
 const $sel = seletor => document.querySelector(seletor);
 
-/*
- * ESTADO DA APLICAÇÃO
- */
 let supa = null;
 let acesso = null;
 let acessoConfirmado = false;
@@ -594,50 +545,57 @@ let diaResultado = null;
 let quizRenderizadoPara = null;
 let S = estadoInicial();
 let uidAtual = null;
+let checkinsSincronizados = false;
+let enviandoCheckin = false;
+let requisicaoCheckins = 0;
 
 /*
- * DATAS E PERÍODO DO TESTE
+ * DATAS DO TESTE
  */
+
 function hojeFortaleza(agora = new Date()) {
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: FUSO,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(agora);
+  const partes = new Intl.DateTimeFormat(
+    'en-CA',
+    {
+      timeZone: FUSO,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }
+  ).formatToParts(agora);
 
   const pegar = tipo =>
-    partes.find(p => p.type === tipo).value;
+    partes.find(p => p.type === tipo)?.value;
 
   return `${pegar('year')}-${pegar('month')}-${pegar('day')}`;
 }
 
-function somarDias(iso, n) {
-  const [y, m, d] = iso.split('-').map(Number);
+function somarDias(iso, quantidade) {
+  const [ano, mes, dia] = iso.split('-').map(Number);
 
   return new Date(
-    Date.UTC(y, m - 1, d + n)
+    Date.UTC(ano, mes - 1, dia + quantidade)
   ).toISOString().slice(0, 10);
 }
 
-function diferencaDias(de, ate) {
-  const [y1, m1, d1] = de.split('-').map(Number);
-  const [y2, m2, d2] = ate.split('-').map(Number);
+function diferencaDias(inicio, fim) {
+  const [a, m, d] = inicio.split('-').map(Number);
+  const [b, n, e] = fim.split('-').map(Number);
 
   return Math.round(
-    (
-      Date.UTC(y2, m2 - 1, d2) -
-      Date.UTC(y1, m1 - 1, d1)
-    ) / 86400000
+    (Date.UTC(b, n - 1, e) - Date.UTC(a, m - 1, d))
+    / 86400000
   );
 }
 
 function formatarData(valor, comHora = false) {
-  const data = new Date(valor);
+  const entrada = /^\d{4}-\d{2}-\d{2}$/.test(valor)
+    ? `${valor}T12:00:00-03:00`
+    : valor;
 
-  if (Number.isNaN(data.getTime())) {
-    return '—';
-  }
+  const data = new Date(entrada);
+
+  if (Number.isNaN(data.getTime())) return '—';
 
   return data.toLocaleString(
     'pt-BR',
@@ -665,33 +623,33 @@ function formatarDataCurta(iso) {
 }
 
 function dataInicioTeste() {
-  if (
-    !acesso ||
-    !acesso.periodo ||
-    !acesso.periodo.inicio
-  ) {
-    return null;
+  const inicio = acesso?.periodo?.inicio;
+
+  if (!inicio) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(inicio)) {
+    return inicio;
   }
 
-  return hojeFortaleza(
-    new Date(acesso.periodo.inicio)
-  );
+  const data = new Date(inicio);
+
+  return Number.isNaN(data.getTime())
+    ? null
+    : hojeFortaleza(data);
 }
 
 function diaDoTeste() {
   const inicio = dataInicioTeste();
 
-  if (!inicio) return null;
-
-  return diferencaDias(
-    inicio,
-    hojeFortaleza()
-  ) + 1;
+  return inicio
+    ? diferencaDias(inicio, hojeFortaleza()) + 1
+    : null;
 }
 
 /*
- * ARMAZENAMENTO LOCAL
+ * ESTADO LOCAL
  */
+
 function estadoInicial() {
   return {
     dias: {},
@@ -708,7 +666,7 @@ function salvarEstado() {
       PREFIXO_ESTADO + uidAtual,
       JSON.stringify(S)
     );
-  } catch (e) {
+  } catch {
     // Armazenamento indisponível.
   }
 }
@@ -718,6 +676,9 @@ function carregarEstado(uid) {
     pauseTimer();
   }
 
+  checkinsSincronizados = false;
+  requisicaoCheckins++;
+
   uidAtual = uid;
   diaResultado = null;
   quizRenderizadoPara = null;
@@ -726,41 +687,35 @@ function carregarEstado(uid) {
 
   try {
     salvo = JSON.parse(
-      localStorage.getItem(
-        PREFIXO_ESTADO + uid
-      ) || 'null'
+      localStorage.getItem(PREFIXO_ESTADO + uid) || 'null'
     );
-  } catch (e) {
+  } catch {
     salvo = null;
   }
 
-  const base = estadoInicial();
+  S = estadoInicial();
 
-  if (
-    salvo &&
-    typeof salvo === 'object'
-  ) {
-    base.dias =
+  if (salvo && typeof salvo === 'object') {
+    S.dias =
       salvo.dias &&
       typeof salvo.dias === 'object' &&
       !Array.isArray(salvo.dias)
         ? salvo.dias
         : {};
 
-    base.ativo =
+    S.ativo =
       salvo.ativo &&
       typeof salvo.ativo === 'object'
         ? salvo.ativo
         : null;
 
-    base.rascunho =
+    S.rascunho =
       salvo.rascunho &&
       typeof salvo.rascunho === 'object'
         ? salvo.rascunho
         : null;
   }
 
-  S = base;
   sanitizarEstado();
 }
 
@@ -781,11 +736,11 @@ function sanitizarEstado() {
       reg.desafios = [];
     }
 
-    reg.desafios.forEach(d => {
-      if (!d || typeof d !== 'object') {
-        return;
-      }
+    reg.desafios = reg.desafios.filter(
+      d => d && typeof d === 'object'
+    );
 
+    for (const d of reg.desafios) {
       if (!CH[d.nivel]) {
         d.nivel = 'mod';
       }
@@ -800,19 +755,14 @@ function sanitizarEstado() {
       if (!Number.isFinite(d.pontos)) {
         d.pontos = CH[d.nivel].pts;
       }
-    });
-
-    reg.desafios = reg.desafios.filter(
-      d => d && typeof d === 'object'
-    );
+    }
   }
 
-  if (S.ativo) {
-    const d = desafioAtivo();
-
-    if (!d || d.status !== 'aceito') {
-      S.ativo = null;
-    }
+  if (
+    S.ativo &&
+    (!desafioAtivo() || desafioAtivo().status !== 'aceito')
+  ) {
+    S.ativo = null;
   }
 
   if (S.rascunho) {
@@ -842,31 +792,25 @@ function registroDoDia(n) {
 }
 
 function checkinDoDia(n) {
-  return S.dias[n] && S.dias[n].checkin
-    ? S.dias[n].checkin
+  const registro = S.dias[n]?.checkin;
+
+  return registro?.origem === 'supabase'
+    ? registro
     : null;
 }
 
 function desafiosDoDia(n) {
-  return S.dias[n] &&
-    Array.isArray(S.dias[n].desafios)
-      ? S.dias[n].desafios
-      : [];
+  return Array.isArray(S.dias[n]?.desafios)
+    ? S.dias[n].desafios
+    : [];
 }
 
 function desafioAtivo() {
-  if (!S.ativo) {
-    return null;
-  }
+  if (!S.ativo) return null;
 
-  return desafiosDoDia(
-    S.ativo.dia
-  )[S.ativo.idx] || null;
+  return desafiosDoDia(S.ativo.dia)[S.ativo.idx] || null;
 }
 
-/*
- * ERROS E TELAS
- */
 class ErroFluxo extends Error {
   constructor(
     mensagem,
@@ -882,20 +826,26 @@ class ErroFluxo extends Error {
   }
 }
 
-function toast(msg) {
-  const t = $('toast');
+/*
+ * CONTROLE DA INTERFACE
+ */
 
-  t.textContent = msg;
-  t.style.opacity = 1;
+function toast(mensagem) {
+  const elemento = $('toast');
+
+  elemento.textContent = mensagem;
+  elemento.style.opacity = 1;
 
   setTimeout(() => {
-    t.style.opacity = 0;
+    elemento.style.opacity = 0;
   }, 2400);
 }
 
 function mostrarCarregandoAcesso(ligado) {
-  $('carregandoAcesso')
-    .classList.toggle('hidden', !ligado);
+  $('carregandoAcesso').classList.toggle(
+    'hidden',
+    !ligado
+  );
 }
 
 function mostrarTela(tela) {
@@ -905,12 +855,9 @@ function mostrarTela(tela) {
     pauseTimer();
   }
 
-  const intro = $('intro');
-
-  intro.classList.toggle(
+  $('intro').classList.toggle(
     'hidden',
-    !['marca', 'formulario', 'boasvindas']
-      .includes(tela)
+    !['marca', 'formulario', 'boasvindas'].includes(tela)
   );
 
   $('espera').classList.toggle(
@@ -923,40 +870,34 @@ function mostrarTela(tela) {
     tela !== 'bloqueio'
   );
 
-  const app = $('app');
-
-  app.classList.toggle(
+  $('app').classList.toggle(
     'hidden',
     tela !== 'app'
   );
 
-  app.classList.toggle(
+  $('app').classList.toggle(
     'md:flex',
     tela === 'app'
   );
 }
 
 function mostrarPassoIntro(passo) {
-  const marca = $('brandStep');
-
-  marca.classList.toggle(
+  $('brandStep').classList.toggle(
     'hidden',
     passo !== 'marca'
   );
 
   if (passo === 'marca') {
-    marca.classList.remove('out');
+    $('brandStep').classList.remove('out');
   }
 
-  const nome = $('nameStep');
-
-  nome.classList.toggle(
+  $('nameStep').classList.toggle(
     'hidden',
     passo !== 'nome'
   );
 
   if (passo === 'nome') {
-    nome.classList.add('fade-in');
+    $('nameStep').classList.add('fade-in');
   }
 
   $('welcomeStep').classList.toggle(
@@ -1014,9 +955,7 @@ function ativarVerificacao() {
   if (document.hidden) return;
 
   timerVerificacao = setInterval(
-    () => verificarAgora({
-      silencioso: true
-    }),
+    () => verificarAgora({ silencioso: true }),
     INTERVALO_VERIFICACAO_MS
   );
 }
@@ -1026,41 +965,28 @@ function pararVerificacao() {
   timerVerificacao = null;
 }
 
-document.addEventListener(
-  'visibilitychange',
-  () => {
-    if (document.hidden) {
-      pararVerificacao();
-      return;
-    }
-
-    if (
-      telaAtual === 'espera' ||
-      telaAtual === 'app'
-    ) {
-      verificarAgora({
-        silencioso: true
-      });
-
-      ativarVerificacao();
-    }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    pararVerificacao();
+    return;
   }
-);
+
+  if (telaAtual === 'espera' || telaAtual === 'app') {
+    verificarAgora({ silencioso: true });
+    ativarVerificacao();
+  }
+});
 
 window.addEventListener('online', () => {
-  if (
-    telaAtual === 'espera' ||
-    telaAtual === 'app'
-  ) {
-    verificarAgora({
-      silencioso: true
-    });
+  if (telaAtual === 'espera' || telaAtual === 'app') {
+    verificarAgora({ silencioso: true });
   }
 });
 
 /*
- * SUPABASE E AUTENTICAÇÃO
+ * AUTENTICAÇÃO
  */
+
 async function iniciarCliente() {
   const resposta = await fetch(
     FUNCOES.config,
@@ -1073,7 +999,7 @@ async function iniciarCliente() {
   );
 
   if (!resposta.ok) {
-    throw new Error('config');
+    throw new Error('Configuração indisponível.');
   }
 
   const config = await resposta.json();
@@ -1082,12 +1008,10 @@ async function iniciarCliente() {
     !config.supabaseUrl ||
     !config.supabasePublishableKey
   ) {
-    throw new Error('config');
+    throw new Error('Configuração inválida.');
   }
 
-  const { createClient } = await import(
-    SUPABASE_ESM
-  );
+  const { createClient } = await import(SUPABASE_ESM);
 
   supa = createClient(
     config.supabaseUrl,
@@ -1107,24 +1031,19 @@ async function sessaoLocal() {
   const { data, error } =
     await supa.auth.getSession();
 
-  if (
-    error ||
-    !data ||
-    !data.session
-  ) {
-    return null;
-  }
-
-  return data.session;
+  return error ? null : data?.session || null;
 }
 
 async function encerrarSessao() {
   pararVerificacao();
   pauseTimer();
 
+  requisicaoCheckins++;
+
   acesso = null;
   acessoConfirmado = false;
   uidAtual = null;
+  checkinsSincronizados = false;
   S = estadoInicial();
   diaResultado = null;
   quizRenderizadoPara = null;
@@ -1133,46 +1052,38 @@ async function encerrarSessao() {
     if (supa) {
       await supa.auth.signOut();
     }
-  } catch (e) {
-    // Sessão local já foi limpa.
+  } catch {
+    // Ignora falha ao encerrar sessão.
   }
 }
 
-function mensagemFalhaAcesso(error) {
-  if (error && error.status === 429) {
-    return 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.';
-  }
-
-  return 'Não foi possível iniciar seu acesso agora. Verifique sua internet e tente novamente.';
+function mensagemFalhaAcesso(erro) {
+  return erro?.status === 429
+    ? 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.'
+    : 'Não foi possível iniciar seu acesso agora. Verifique sua internet e tente novamente.';
 }
 
-async function postServidor(
-  url,
-  { token, corpo } = {}
-) {
-  const cabecalhos = {};
+async function postServidor(url, { token, corpo } = {}) {
+  const headers = {};
 
   if (token) {
-    cabecalhos.Authorization =
-      `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
 
   if (corpo !== undefined) {
-    cabecalhos['Content-Type'] =
-      'application/json';
+    headers['Content-Type'] = 'application/json';
   }
 
   try {
     return await fetch(url, {
       method: 'POST',
-      headers: cabecalhos,
-      body:
-        corpo !== undefined
-          ? JSON.stringify(corpo)
-          : undefined,
+      headers,
+      body: corpo !== undefined
+        ? JSON.stringify(corpo)
+        : undefined,
       cache: 'no-store'
     });
-  } catch (e) {
+  } catch {
     throw new ErroFluxo(
       'Sem conexão. Verifique sua internet e tente novamente.',
       'rede'
@@ -1183,23 +1094,17 @@ async function postServidor(
 async function lerJson(resposta) {
   try {
     return await resposta.json();
-  } catch (e) {
+  } catch {
     return {};
   }
 }
 
-async function tokenDaSessao(
-  renovar = false
-) {
+async function tokenDaSessao(renovar = false) {
   if (renovar) {
     const { data, error } =
       await supa.auth.refreshSession();
 
-    if (
-      error ||
-      !data ||
-      !data.session
-    ) {
+    if (error || !data?.session) {
       throw new ErroFluxo(
         'Não foi possível confirmar sua sessão.',
         'sessao'
@@ -1224,24 +1129,17 @@ async function tokenDaSessao(
 async function consultarServidor() {
   let resposta = await postServidor(
     FUNCOES.consultar,
-    {
-      token: await tokenDaSessao()
-    }
+    { token: await tokenDaSessao() }
   );
 
   if (resposta.status === 401) {
     resposta = await postServidor(
       FUNCOES.consultar,
-      {
-        token: await tokenDaSessao(true)
-      }
+      { token: await tokenDaSessao(true) }
     );
   }
 
-  if (
-    resposta.status === 401 ||
-    resposta.status === 403
-  ) {
+  if ([401, 403].includes(resposta.status)) {
     throw new ErroFluxo(
       'Sessão inválida.',
       'sessao',
@@ -1253,14 +1151,112 @@ async function consultarServidor() {
 
   if (!resposta.ok) {
     throw new ErroFluxo(
-      dados.erro ||
-        'Não foi possível verificar seu acesso agora.',
+      dados.erro || 'Não foi possível verificar seu acesso agora.',
       'servidor',
       resposta.status
     );
   }
 
   return dados;
+}
+
+/*
+ * CHECK-INS NO SUPABASE
+ */
+
+function aplicarCheckinRemoto(registro) {
+  const dia = Number(registro?.dia_numero);
+
+  if (
+    !Number.isInteger(dia) ||
+    dia < 1 ||
+    dia > 7
+  ) {
+    return;
+  }
+
+  registroDoDia(dia).checkin = {
+    origem: 'supabase',
+    respostas: registro.respostas,
+    pontuacao: registro.pontuacao,
+    nivel: registro.nivel === 'moderado'
+      ? 'mod'
+      : registro.nivel,
+    registradoEm: registro.primeiro_envio_em,
+    recuperado: registro.enviado_atrasado === true
+  };
+}
+
+async function carregarCheckinsServidor() {
+  checkinsSincronizados = false;
+
+  const minhaRequisicao = ++requisicaoCheckins;
+  const uidInicial = uidAtual;
+
+  let resposta = await fetch(
+    FUNCOES.checkin,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${await tokenDaSessao()}`
+      },
+      cache: 'no-store'
+    }
+  );
+
+  if (resposta.status === 401) {
+    resposta = await fetch(
+      FUNCOES.checkin,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${await tokenDaSessao(true)}`
+        },
+        cache: 'no-store'
+      }
+    );
+  }
+
+  if (!resposta.ok) {
+    throw new Error(
+      'Não foi possível carregar os check-ins.'
+    );
+  }
+
+  const dados = await resposta.json();
+
+  if (!Array.isArray(dados.checkins)) {
+    throw new Error(
+      'Resposta inválida do servidor.'
+    );
+  }
+
+  if (
+    minhaRequisicao !== requisicaoCheckins ||
+    uidInicial !== uidAtual
+  ) {
+    return;
+  }
+
+  for (let dia = 1; dia <= 7; dia++) {
+    const local = registroDoDia(dia);
+
+    if (
+      local.checkin &&
+      local.checkin.origem !== 'supabase'
+    ) {
+      local.checkinAnteriorLocal = local.checkin;
+    }
+
+    local.checkin = null;
+  }
+
+  dados.checkins.forEach(aplicarCheckinRemoto);
+
+  checkinsSincronizados = true;
+
+  salvarEstado();
+  atualizarBloqueios();
 }
 
 function vinculado() {
@@ -1270,8 +1266,7 @@ function vinculado() {
 }
 
 function podeRegistrar() {
-  return coletaLiberada() &&
-    acessoConfirmado;
+  return coletaLiberada() && acessoConfirmado;
 }
 
 async function verificarAgora({
@@ -1287,23 +1282,17 @@ async function verificarAgora({
   try {
     const dados = await consultarServidor();
 
-    if (minha !== seqAcesso) {
-      return;
-    }
+    if (minha !== seqAcesso) return;
 
     acessoConfirmado = true;
     registrarVerificacao();
 
-    aplicarAcesso(dados, {
-      aposEnvio
-    });
-  } catch (err) {
-    if (minha !== seqAcesso) {
-      return;
-    }
+    aplicarAcesso(dados, { aposEnvio });
+  } catch (erro) {
+    if (minha !== seqAcesso) return;
 
     tratarFalhaVerificacao(
-      err,
+      erro,
       { silencioso }
     );
   } finally {
@@ -1314,30 +1303,30 @@ async function verificarAgora({
 }
 
 function tratarFalhaVerificacao(
-  err,
+  erro,
   { silencioso }
 ) {
   acessoConfirmado = false;
 
-  if (err.tipo === 'sessao') {
+  if (erro.tipo === 'sessao') {
     if (vinculado()) {
       mostrarBloqueio(
         'Sessão não confirmada',
         'Não foi possível confirmar sua sessão. Recarregue a página. Se o problema continuar, procure a equipe.'
       );
     } else {
-      encerrarSessao().then(() => {
+      encerrarSessao().then(() =>
         mostrarFormulario(
           'Sua sessão expirou. Informe seu nome novamente.'
-        );
-      });
+        )
+      );
     }
 
     return;
   }
 
   const mensagem =
-    err.message ||
+    erro.message ||
     'Não foi possível verificar seu acesso agora.';
 
   if (
@@ -1348,14 +1337,12 @@ function tratarFalhaVerificacao(
       ultimoNomeEnviado,
       MSG_ESPERA_FALHA
     );
-
     return;
   }
 
   if (telaAtual === 'espera') {
     $('esperaUltima').textContent =
       `${mensagem} ${MSG_ESPERA_FALHA}`;
-
     return;
   }
 
@@ -1365,7 +1352,6 @@ function tratarFalhaVerificacao(
     if (!silencioso) {
       toast(mensagem);
     }
-
     return;
   }
 
@@ -1375,9 +1361,6 @@ function tratarFalhaVerificacao(
   );
 }
 
-/*
- * AUTORIZAÇÃO DO ESTUDANTE
- */
 function aplicarAcesso(
   dados,
   { aposEnvio = false } = {}
@@ -1389,14 +1372,10 @@ function aplicarAcesso(
     return;
   }
 
-  if (
-    dados.motivo ===
-    'aguardando_autorizacao'
-  ) {
+  if (dados.motivo === 'aguardando_autorizacao') {
     mostrarEspera(
       dados.nome || ultimoNomeEnviado
     );
-
     return;
   }
 
@@ -1404,19 +1383,14 @@ function aplicarAcesso(
     mostrarFormulario(
       aposEnvio ? MSG_SEM_REGISTRO : ''
     );
-
     return;
   }
 
-  if (
-    dados.motivo ===
-    'participante_inativo'
-  ) {
+  if (dados.motivo === 'participante_inativo') {
     mostrarBloqueio(
       BLOQUEIO_PARTICIPANTE_INATIVO.titulo,
       BLOQUEIO_PARTICIPANTE_INATIVO.texto
     );
-
     return;
   }
 
@@ -1435,34 +1409,32 @@ function coletaLiberada() {
     dataInicioTeste() !== null;
 }
 
-function textoBloqueio(oque) {
+function textoBloqueio(tipo) {
   if (
-    acesso &&
-    acesso.fase === 'antes_do_inicio' &&
+    acesso?.fase === 'antes_do_inicio' &&
     acesso.periodo
   ) {
-    return `Os ${oque} começam em ${formatarData(
-      acesso.periodo.inicio
-    )}. Até lá, você pode explorar o aplicativo.`;
+    return `Os ${tipo} começam em ${formatarData(acesso.periodo.inicio)}. Até lá, você pode explorar o aplicativo.`;
   }
 
-  return `Os ${oque} ainda não estão liberados.`;
+  return `Os ${tipo} ainda não estão liberados.`;
 }
 
 function entrarNoApp(comBoasVindas) {
-  const nome =
-    (acesso && acesso.nome) || '';
+  const nome = acesso?.nome || '';
 
-  $('greet').textContent =
-    `Olá, ${nome}`;
-
+  $('greet').textContent = `Olá, ${nome}`;
   $('sideName').textContent = nome;
-  $('hello').textContent =
-    'Seja bem-vindo(a)';
+  $('hello').textContent = 'Seja bem-vindo(a)';
   $('whoName').textContent = nome;
 
   if (telaAtual === 'app') {
     atualizarBloqueios();
+
+    if (!checkinsSincronizados) {
+      carregarCheckinsServidor().catch(() => {});
+    }
+
     return;
   }
 
@@ -1485,56 +1457,46 @@ function entrarNoApp(comBoasVindas) {
 
 function abrirApp() {
   mostrarTela('app');
-  mostrarSecao(
-    secaoAtual || 'home'
-  );
+  mostrarSecao(secaoAtual || 'home');
   atualizarBloqueios();
   ativarVerificacao();
+
+  carregarCheckinsServidor().catch(() => {
+    checkinsSincronizados = false;
+    atualizarBloqueios();
+
+    toast(
+      'Não foi possível sincronizar os check-ins. Tente novamente ou atualize a página.'
+    );
+  });
 }
 
 function atualizarBanner() {
   const banner = $('periodoBanner');
   const dia = diaDoTeste();
+
   let texto = '';
 
-  if (
-    acesso &&
-    acesso.pode_entrar === true
-  ) {
+  if (acesso?.pode_entrar === true) {
     if (!acessoConfirmado) {
       texto = MSG_SEM_CONFIRMACAO;
     } else if (!dataInicioTeste()) {
       texto =
         'Acesso liberado. A data oficial do teste ainda não foi definida; os check-ins ainda não estão disponíveis.';
-    } else if (
-      acesso.fase === 'antes_do_inicio'
-    ) {
+    } else if (acesso.fase === 'antes_do_inicio') {
       texto =
-        `Acesso liberado. Os check-ins começam em ${formatarData(
-          acesso.periodo.inicio
-        )}. Use este tempo para preparar seu aparelho.`;
-    } else if (
-      dia === DIAS_DO_TESTE + 1
-    ) {
+        `Acesso liberado. Os check-ins começam em ${formatarData(acesso.periodo.inicio)}. Use este tempo para preparar seu aparelho.`;
+    } else if (dia === DIAS_DO_TESTE + 1) {
       texto =
         'Hoje é o Dia 8: você pode apenas recuperar o check-in do Dia 7. Novos desafios não estão disponíveis.';
-    } else if (
-      acesso.fase === 'coleta'
-    ) {
+    } else if (acesso.fase === 'coleta') {
       texto =
-        `Check-ins abertos até ${formatarData(
-          acesso.periodo.fim,
-          true
-        )}.`;
+        `Check-ins abertos até ${formatarData(acesso.periodo.fim, true)}.`;
     }
   }
 
   banner.textContent = texto;
-
-  banner.classList.toggle(
-    'hidden',
-    !texto
-  );
+  banner.classList.toggle('hidden', !texto);
 
   $('homeComecarNota').textContent =
     coletaLiberada()
@@ -1550,43 +1512,31 @@ function atualizarBloqueios() {
     pauseTimer();
   }
 
-  if (secaoAtual === 'checkin') {
-    renderCheckin();
-  }
-
-  if (secaoAtual === 'challenge') {
-    renderChallenge();
-  }
-
-  if (secaoAtual === 'progress') {
-    renderProgress();
-  }
+  if (secaoAtual === 'checkin') renderCheckin();
+  if (secaoAtual === 'challenge') renderChallenge();
+  if (secaoAtual === 'progress') renderProgress();
 }
 
 function sincronizarDesafioAtivo() {
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
-  if (!d) {
+  if (!desafio) {
     if (S.ativo) {
       S.ativo = null;
       salvarEstado();
     }
-
     return;
   }
 
-  if (!running && d.prazo) {
-    d.rem = restanteDoDesafio(d);
-    d.prazo = null;
+  if (!running && desafio.prazo) {
+    desafio.rem = restanteDoDesafio(desafio);
+    desafio.prazo = null;
     salvarEstado();
   }
 
   const dia = diaDoTeste();
 
-  if (
-    dia !== null &&
-    dia !== S.ativo.dia
-  ) {
+  if (dia !== null && dia !== S.ativo.dia) {
     descartarDesafioAtivo();
     return;
   }
@@ -1597,24 +1547,21 @@ function sincronizarDesafioAtivo() {
 }
 
 /*
- * ABERTURA DO APLICATIVO
+ * NOME E SOLICITAÇÃO DE ACESSO
  */
+
 function construirMarca() {
-  [...'Fair Play'].forEach((ch, i) => {
-    const letra =
-      document.createElement('span');
+  [...'Fair Play'].forEach((caractere, indice) => {
+    const letra = document.createElement('span');
 
     letra.className = 'brand-letter';
-
     letra.style.animationDelay =
-      (0.2 + i * 0.09) + 's';
+      (0.2 + indice * 0.09) + 's';
 
     letra.textContent =
-      ch === ' ' ? '\u00a0' : ch;
+      caractere === ' ' ? '\u00a0' : caractere;
 
-    $('brandWord').appendChild(
-      letra
-    );
+    $('brandWord').appendChild(letra);
   });
 }
 
@@ -1637,9 +1584,7 @@ function validarNomeEstudante(valor) {
     return 'Informe somente o seu primeiro nome.';
   }
 
-  if (
-    !/^\p{L}[\p{L}'’-]*$/u.test(nome)
-  ) {
+  if (!/^\p{L}[\p{L}'’-]*$/u.test(nome)) {
     return 'Use apenas letras, sem números ou símbolos.';
   }
 
@@ -1672,10 +1617,7 @@ function mensagemErroSolicitacao(resposta) {
     );
   }
 
-  if (
-    resposta.status === 401 ||
-    resposta.status === 403
-  ) {
+  if ([401, 403].includes(resposta.status)) {
     return new ErroFluxo(
       'Não foi possível confirmar sua sessão. Tente novamente.',
       'sessao',
@@ -1693,39 +1635,32 @@ function mensagemErroSolicitacao(resposta) {
 function definirEnvio(ligado) {
   enviando = ligado;
 
-  const botao = $('nameSubmit');
-
-  botao.disabled = ligado || !supa;
-
-  botao.textContent =
+  $('nameSubmit').disabled = ligado || !supa;
+  $('nameSubmit').textContent =
     ligado ? 'ENVIANDO...' : 'CONTINUAR';
 
   $('nameInput').disabled = ligado;
 
-  const aviso = $('formAviso');
-
   if (ligado) {
-    aviso.textContent =
+    $('formAviso').textContent =
       'Enviando sua solicitação...';
   } else if (
-    aviso.textContent ===
+    $('formAviso').textContent ===
     'Enviando sua solicitação...'
   ) {
-    aviso.textContent = '';
+    $('formAviso').textContent = '';
   }
 }
 
 async function enviarSolicitacao() {
   if (enviando) return;
 
-  const nome =
-    $('nameInput').value.trim();
+  const nome = $('nameInput').value.trim();
 
   $('nameErr').textContent = '';
   $('formAviso').textContent = '';
 
-  const erroNome =
-    validarNomeEstudante(nome);
+  const erroNome = validarNomeEstudante(nome);
 
   if (erroNome) {
     $('nameErr').textContent = erroNome;
@@ -1736,7 +1671,6 @@ async function enviarSolicitacao() {
   if (!supa) {
     $('formAviso').textContent =
       'Não foi possível conectar. Atualize a página.';
-
     return;
   }
 
@@ -1751,11 +1685,7 @@ async function enviarSolicitacao() {
       const { data, error } =
         await supa.auth.signInAnonymously();
 
-      if (
-        error ||
-        !data ||
-        !data.session
-      ) {
+      if (error || !data?.session) {
         throw new ErroFluxo(
           mensagemFalhaAcesso(error),
           'auth'
@@ -1765,12 +1695,8 @@ async function enviarSolicitacao() {
       sessao = data.session;
     }
 
-    if (
-      uidAtual !== sessao.user.id
-    ) {
-      carregarEstado(
-        sessao.user.id
-      );
+    if (uidAtual !== sessao.user.id) {
+      carregarEstado(sessao.user.id);
     }
 
     const resposta = await postServidor(
@@ -1779,18 +1705,13 @@ async function enviarSolicitacao() {
         token: sessao.access_token,
         corpo: {
           nome,
-          tipo_dispositivo:
-            TIPO_DISPOSITIVO_PADRAO
+          tipo_dispositivo: TIPO_DISPOSITIVO_PADRAO
         }
       }
     );
 
-    if (
-      resposta.status !== 202
-    ) {
-      throw mensagemErroSolicitacao(
-        resposta
-      );
+    if (resposta.status !== 202) {
+      throw mensagemErroSolicitacao(resposta);
     }
 
     solicitacaoEnviada = true;
@@ -1798,13 +1719,13 @@ async function enviarSolicitacao() {
     await verificarAgora({
       aposEnvio: true
     });
-  } catch (err) {
-    if (err.tipo === 'sessao') {
+  } catch (erro) {
+    if (erro.tipo === 'sessao') {
       await encerrarSessao();
     }
 
     $('formAviso').textContent =
-      err.message ||
+      erro.message ||
       'Algo deu errado. Tente novamente.';
   } finally {
     definirEnvio(false);
@@ -1813,60 +1734,41 @@ async function enviarSolicitacao() {
 
 /*
  * NAVEGAÇÃO
- *
- * Os botões do menu não recebem emojis
- * nem ícones automaticamente.
  */
+
 function go(id) {
   mostrarSecao(id);
 }
 
 function mostrarSecao(id) {
-  if (telaAtual !== 'app') {
-    return;
-  }
-
-  const alvo = $(id);
-
-  if (!alvo) {
+  if (telaAtual !== 'app' || !$(id)) {
     return;
   }
 
   secaoAtual = id;
 
-  $$('.screen').forEach(s => {
-    s.classList.add('hidden');
+  $$('.screen').forEach(tela => {
+    tela.classList.add('hidden');
   });
 
-  alvo.classList.remove('hidden');
+  $(id).classList.remove('hidden');
 
-  alvo.style.animation = 'none';
-  void alvo.offsetWidth;
-  alvo.style.animation = '';
+  $(id).style.animation = 'none';
+  void $(id).offsetWidth;
+  $(id).style.animation = '';
 
-  $$('[data-nav]').forEach(b => {
-    b.classList.toggle(
+  $$('[data-nav]').forEach(botao => {
+    botao.classList.toggle(
       'active',
-      b.dataset.nav ===
+      botao.dataset.nav ===
         (id === 'result' ? 'checkin' : id)
     );
   });
 
-  if (id === 'checkin') {
-    renderCheckin();
-  }
-
-  if (id === 'result') {
-    showResult();
-  }
-
-  if (id === 'challenge') {
-    renderChallenge();
-  }
-
-  if (id === 'progress') {
-    renderProgress();
-  }
+  if (id === 'checkin') renderCheckin();
+  if (id === 'result') showResult();
+  if (id === 'challenge') renderChallenge();
+  if (id === 'progress') renderProgress();
 
   window.scrollTo({
     top: 0,
@@ -1874,9 +1776,8 @@ function mostrarSecao(id) {
   });
 }
 
-document.addEventListener('click', e => {
-  const botao =
-    e.target.closest('[data-go]');
+document.addEventListener('click', evento => {
+  const botao = evento.target.closest('[data-go]');
 
   if (botao) {
     go(botao.dataset.go);
@@ -1884,8 +1785,9 @@ document.addEventListener('click', e => {
 });
 
 /*
- * CHECK-IN DOS SETE DIAS
+ * QUESTIONÁRIO DIÁRIO
  */
+
 function estadoCheckin() {
   if (!coletaLiberada()) {
     return {
@@ -1894,35 +1796,38 @@ function estadoCheckin() {
     };
   }
 
-  const dia = diaDoTeste();
-  let e;
+  if (!checkinsSincronizados) {
+    return {
+      tipo: 'sem_confirmacao',
+      texto:
+        'Confirmando os check-ins salvos no Supabase. Aguarde ou atualize a página.'
+    };
+  }
 
-  if (
-    dia === DIAS_DO_TESTE + 1
-  ) {
-    e = checkinDoDia(DIAS_DO_TESTE)
+  const dia = diaDoTeste();
+  let estado;
+
+  if (dia === DIAS_DO_TESTE + 1) {
+    estado = checkinDoDia(DIAS_DO_TESTE)
       ? {
           tipo: 'dia8_fechado',
           alvo: DIAS_DO_TESTE,
-          texto:
-            'Hoje é o Dia 8. Seu check-in do Dia 7 já está registrado. Não há novo check-in neste dia.'
+          texto: 'Hoje é o Dia 8. Seu check-in do Dia 7 já está registrado. Não há novo check-in neste dia.'
         }
       : {
           tipo: 'recuperacao',
           alvo: DIAS_DO_TESTE,
-          texto:
-            'Hoje é o Dia 8: você pode apenas recuperar o check-in do Dia 7. Não há novo check-in para o Dia 8.'
+          texto: 'Hoje é o Dia 8: você pode apenas recuperar o check-in do Dia 7. Não há novo check-in para o Dia 8.'
         };
   } else if (
     dia >= 1 &&
     dia <= DIAS_DO_TESTE
   ) {
-    e = checkinDoDia(dia)
+    estado = checkinDoDia(dia)
       ? {
           tipo: 'ja_feito',
           alvo: dia,
-          texto:
-            `Seu check-in do Dia ${dia} já está registrado. Toque em VER MEU RESULTADO para revê-lo.`
+          texto: `Seu check-in do Dia ${dia} já está registrado. Toque em VER MEU RESULTADO para revê-lo.`
         }
       : {
           tipo: 'novo',
@@ -1936,10 +1841,7 @@ function estadoCheckin() {
   }
 
   if (
-    (
-      e.tipo === 'novo' ||
-      e.tipo === 'recuperacao'
-    ) &&
+    ['novo', 'recuperacao'].includes(estado.tipo) &&
     !acessoConfirmado
   ) {
     return {
@@ -1948,110 +1850,97 @@ function estadoCheckin() {
     };
   }
 
-  return e;
+  return estado;
 }
 
 function renderCheckin() {
-  const e = estadoCheckin();
+  const estado = estadoCheckin();
   const caixa = $('checkinBloqueio');
 
-  const alerta =
-    e.tipo === 'bloqueado' ||
-    e.tipo === 'sem_confirmacao';
+  const bloqueado =
+    estado.tipo === 'bloqueado' ||
+    estado.tipo === 'sem_confirmacao';
 
   caixa.classList.toggle(
     'hidden',
-    e.tipo === 'novo'
+    estado.tipo === 'novo'
   );
 
   caixa.classList.toggle(
     'aviso-alerta',
-    alerta
+    bloqueado
   );
 
   caixa.classList.toggle(
     'aviso-info',
-    !alerta
+    !bloqueado
   );
 
   $('checkinBloqueioTexto').textContent =
-    e.texto || '';
-
-  const mostrarQuiz =
-    e.tipo !== 'bloqueado' &&
-    e.tipo !== 'sem_confirmacao';
+    estado.texto || '';
 
   $('quizArea').classList.toggle(
     'hidden',
-    !mostrarQuiz
+    bloqueado
   );
 
   if (
-    e.tipo === 'novo' ||
-    e.tipo === 'recuperacao'
+    estado.tipo === 'novo' ||
+    estado.tipo === 'recuperacao'
   ) {
-    renderQuiz(e.alvo);
+    renderQuiz(estado.alvo);
   } else {
     limparQuiz();
   }
 }
 
-/*
- * Mostra cinco perguntas correspondentes
- * ao dia do teste.
- */
-function renderQuiz(alvo) {
-  const perguntas = perguntasDoDia(alvo);
+function renderQuiz(dia) {
+  const perguntas = perguntasDoDia(dia);
 
   if (perguntas.length !== 5) {
     $('quizErr').textContent =
       'Questionário indisponível para este dia.';
-
     return;
   }
 
   if (
     !S.rascunho ||
-    S.rascunho.dia !== alvo ||
+    S.rascunho.dia !== dia ||
     !Array.isArray(S.rascunho.ans) ||
     S.rascunho.ans.length !== 5
   ) {
     S.rascunho = {
-      dia: alvo,
+      dia,
       ans: perguntas.map(() => null)
     };
 
     salvarEstado();
   }
 
-  if (
-    quizRenderizadoPara === alvo
-  ) {
+  if (quizRenderizadoPara === dia) {
     return;
   }
 
-  quizRenderizadoPara = alvo;
+  quizRenderizadoPara = dia;
   $('quizErr').textContent = '';
 
-  $('quiz').innerHTML = perguntas
-    .map((q, i) => `
-      <div class="q" data-q="${i}">
-        <h2 class="qt font-display font-bold text-lg mb-3">
-          ${i + 1}. ${q.q}
-        </h2>
-        <div class="space-y-2">
-          ${q.o.map((op, j) => `
-            <button
-              type="button"
-              class="opt${S.rascunho.ans[i] === j ? ' sel' : ''}"
-              data-q="${i}"
-              data-v="${j}"
-            >${op.texto}</button>
-          `).join('')}
-        </div>
+  $('quiz').innerHTML = perguntas.map((pergunta, i) => `
+    <div class="q" data-q="${i}">
+      <h2 class="qt font-display font-bold text-lg mb-3">
+        ${i + 1}. ${pergunta.q}
+      </h2>
+      <div class="space-y-2">
+        ${pergunta.o.map((alternativa, j) => `
+          <button
+            type="button"
+            class="opt${S.rascunho.ans[i] === j ? ' sel' : ''}"
+            data-q="${i}"
+            data-v="${j}"
+          >${alternativa.texto}</button>
+        `).join('')}
       </div>
-    `)
-    .join('');
+    </div>
+  `).join('');
 }
 
 function limparQuiz() {
@@ -2065,110 +1954,92 @@ function abrirResultado(dia) {
   go('result');
 }
 
-$('quiz').addEventListener('click', e => {
-  const botao =
-    e.target.closest('.opt');
+$('quiz').addEventListener('click', evento => {
+  const botao = evento.target.closest('.opt');
 
   if (!botao) return;
 
-  const est = estadoCheckin();
+  const estado = estadoCheckin();
 
-  if (
-    est.tipo !== 'novo' &&
-    est.tipo !== 'recuperacao'
-  ) {
+  if (!['novo', 'recuperacao'].includes(estado.tipo)) {
     toast(
-      est.texto ||
-      MSG_CHECKIN_BLOQUEADO
+      estado.texto || MSG_CHECKIN_BLOQUEADO
     );
-
     return;
   }
 
   if (
     !S.rascunho ||
-    S.rascunho.dia !== est.alvo
+    S.rascunho.dia !== estado.alvo
   ) {
     return;
   }
 
-  const i = Number(
-    botao.dataset.q
-  );
+  const indice = Number(botao.dataset.q);
 
-  S.rascunho.ans[i] = Number(
-    botao.dataset.v
-  );
+  S.rascunho.ans[indice] =
+    Number(botao.dataset.v);
 
   salvarEstado();
 
-  $$(`.opt[data-q="${i}"]`)
-    .forEach(o => {
-      o.classList.toggle(
-        'sel',
-        o === botao
-      );
-    });
+  $$(`.opt[data-q="${indice}"]`).forEach(opcao => {
+    opcao.classList.toggle(
+      'sel',
+      opcao === botao
+    );
+  });
 
-  $sel(`.q[data-q="${i}"]`)
+  $sel(`.q[data-q="${indice}"]`)
     ?.classList.remove('missing');
 
   $('quizErr').textContent = '';
 });
 
 /*
- * CÁLCULO EDUCATIVO
- *
- * Menos de três respostas pontuáveis:
- * sem classificação.
+ * ENVIO DEFINITIVO DO CHECK-IN
  */
-$('seeResult').addEventListener('click', () => {
-  const est = estadoCheckin();
+
+$('seeResult').addEventListener('click', async () => {
+  if (enviandoCheckin) return;
+
+  const estado = estadoCheckin();
 
   if (
-    est.tipo === 'ja_feito' ||
-    est.tipo === 'dia8_fechado'
+    estado.tipo === 'ja_feito' ||
+    estado.tipo === 'dia8_fechado'
   ) {
-    abrirResultado(est.alvo);
+    abrirResultado(estado.alvo);
     return;
   }
 
-  if (
-    est.tipo !== 'novo' &&
-    est.tipo !== 'recuperacao'
-  ) {
+  if (!['novo', 'recuperacao'].includes(estado.tipo)) {
     toast(
-      est.texto ||
-      MSG_CHECKIN_BLOQUEADO
+      estado.texto || MSG_CHECKIN_BLOQUEADO
     );
-
     return;
   }
 
   const perguntas =
-    perguntasDoDia(est.alvo);
+    perguntasDoDia(estado.alvo);
 
   const respostas =
-    S.rascunho?.dia === est.alvo
+    S.rascunho?.dia === estado.alvo
       ? S.rascunho.ans
       : [];
 
-  if (
-    perguntas.length !== 5
-  ) {
+  if (perguntas.length !== 5) {
     $('quizErr').textContent =
-      'Questionário indisponível para este dia.';
-
+      'Questionário indisponível.';
     return;
   }
 
   const faltando = perguntas
-    .map((q, i) => {
-      return !Number.isInteger(respostas[i]) ||
-        !q.o[respostas[i]]
-          ? i
-          : -1;
-    })
+    .map((pergunta, i) =>
+      !Number.isInteger(respostas[i]) ||
+      !pergunta.o[respostas[i]]
+        ? i
+        : -1
+    )
     .filter(i => i >= 0);
 
   if (faltando.length) {
@@ -2180,141 +2051,132 @@ $('seeResult').addEventListener('click', () => {
     $('quizErr').textContent =
       'Responda todas as cinco perguntas.';
 
-    $sel(
-      `.q[data-q="${faltando[0]}"]`
-    )?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center'
-    });
+    $sel(`.q[data-q="${faltando[0]}"]`)
+      ?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
 
     return;
   }
 
-  const respostasEstruturadas =
-    perguntas.map((q, i) => {
-      const opcao =
-        q.o[respostas[i]];
-
-      return {
-        pergunta: q.id,
-        alternativa: opcao.id,
-        tipo: opcao.tipo,
-        valor: opcao.valor
-      };
-    });
-
-  const pontuaveis =
-    respostasEstruturadas.filter(
-      r => r.tipo === 'pontuavel'
-    );
-
-  const soma = pontuaveis.reduce(
-    (total, r) => total + r.valor,
-    0
+  const alternativas = perguntas.map(
+    (pergunta, i) =>
+      pergunta.o[respostas[i]].id
   );
 
-  const pontuacao =
-    pontuaveis.length < 3
-      ? null
-      : Math.round(
-          (
-            soma /
-            (2 * pontuaveis.length)
-          ) * 10
-        );
+  enviandoCheckin = true;
+  $('seeResult').disabled = true;
+  $('quizErr').textContent =
+    'Salvando suas respostas...';
 
-  const nivel =
-    pontuacao === null
-      ? null
-      : pontuacao <= 3
-        ? 'baixo'
-        : pontuacao <= 7
-          ? 'mod'
-          : 'alto';
+  try {
+    let resposta = await postServidor(
+      FUNCOES.checkin,
+      {
+        token: await tokenDaSessao(),
+        corpo: { respostas: alternativas }
+      }
+    );
 
-  registroDoDia(est.alvo).checkin = {
-    versaoCatalogo:
-      'rascunho-2026.1',
-    respostas:
-      respostasEstruturadas,
-    pontuacao,
-    nivel,
-    registradoEm:
-      new Date().toISOString(),
-    recuperado:
-      est.tipo === 'recuperacao'
-  };
+    if (resposta.status === 401) {
+      resposta = await postServidor(
+        FUNCOES.checkin,
+        {
+          token: await tokenDaSessao(true),
+          corpo: { respostas: alternativas }
+        }
+      );
+    }
 
-  S.rascunho = null;
+    if (resposta.status === 409) {
+      await carregarCheckinsServidor();
 
-  salvarEstado();
-  abrirResultado(est.alvo);
+      if (checkinDoDia(estado.alvo)) {
+        S.rascunho = null;
+        salvarEstado();
+        abrirResultado(estado.alvo);
+        return;
+      }
+
+      throw new Error(
+        'Check-in já registrado.'
+      );
+    }
+
+    if (!resposta.ok) {
+      const dados = await lerJson(resposta);
+
+      throw new Error(
+        dados.erro ||
+        'Não foi possível salvar o check-in.'
+      );
+    }
+
+    const dados = await resposta.json();
+
+    if (!dados.checkin) {
+      throw new Error(
+        'Servidor não confirmou o registro.'
+      );
+    }
+
+    aplicarCheckinRemoto(dados.checkin);
+
+    S.rascunho = null;
+    salvarEstado();
+
+    $('quizErr').textContent = '';
+    abrirResultado(estado.alvo);
+  } catch (erro) {
+    $('quizErr').textContent =
+      `Não conseguimos confirmar a gravação. Suas respostas continuam preenchidas. ${erro.message || 'Tente novamente.'}`;
+  } finally {
+    enviandoCheckin = false;
+    $('seeResult').disabled = false;
+  }
 });
 
 /*
- * RESULTADO DO DIA
+ * TELA DE RESULTADO SEM ÍCONES COLORIDOS
  */
+
 function showResult() {
-  const c = diaResultado
+  const checkin = diaResultado
     ? checkinDoDia(diaResultado)
     : null;
 
-  if (!c) {
+  if (!checkin) {
     go('checkin');
     return;
   }
 
-  const r =
-    RESULTS[c.nivel] ||
+  const resultado =
+    RESULTS[checkin.nivel] ||
     RESULTS.neutro;
 
-  $('resEmoji').textContent =
-    r.emoji;
-
-  $('resTitle').textContent =
-    r.title;
-
-  $('resText').textContent =
-    r.text;
-
-  $('resRec').textContent =
-    r.rec;
+  $('resTitle').textContent = resultado.title;
+  $('resText').textContent = resultado.text;
+  $('resRec').textContent = resultado.rec;
 
   $('resTipCard').classList.toggle(
     'hidden',
-    !r.tip
+    !resultado.tip
   );
 
   $('resTip').textContent =
-    r.tip || '';
+    resultado.tip || '';
 
   $('lvlLabel').textContent =
-    r.label;
+    resultado.label;
 
-  $('lvlLabel').style.color =
-    r.color === '#FACC15'
-      ? '#a16207'
-      : r.color;
-
-  const segmentos =
-    $$('#gauge .seg');
-
-  segmentos.forEach(s => {
-    s.style.background = '';
-  });
-
-  setTimeout(() => {
-    segmentos.forEach((s, i) => {
-      if (i < r.n) {
-        s.style.background = r.color;
-      }
-    });
-  }, 150);
+  $('lvlLabel').style.color = '';
 }
 
 /*
  * DESAFIOS
  */
+
 function nivelHoje() {
   const dia = diaDoTeste();
 
@@ -2326,132 +2188,116 @@ function nivelHoje() {
     return null;
   }
 
-  const c = checkinDoDia(dia);
-
-  return c ? c.nivel : null;
+  return checkinDoDia(dia)?.nivel || null;
 }
 
 function nivelDesafioNovo() {
   const hoje = nivelHoje();
 
-  if (hoje) {
-    return hoje;
-  }
+  if (hoje) return hoje;
 
   const dia = diaDoTeste();
 
-  const limite =
-    dia === null
-      ? DIAS_DO_TESTE
-      : Math.min(
-          Math.max(dia, 0),
-          DIAS_DO_TESTE
-        );
+  const limite = dia === null
+    ? DIAS_DO_TESTE
+    : Math.min(
+        Math.max(dia, 0),
+        DIAS_DO_TESTE
+      );
 
-  for (
-    let n = limite;
-    n >= 1;
-    n--
-  ) {
-    const c = checkinDoDia(n);
+  for (let n = limite; n >= 1; n--) {
+    const checkin = checkinDoDia(n);
 
-    if (c) {
-      return c.nivel || 'neutro';
+    if (checkin) {
+      return checkin.nivel || 'neutro';
     }
   }
 
   return 'neutro';
 }
 
-function restanteDoDesafio(d) {
+function restanteDoDesafio(desafio) {
   const total =
-    CH[d.nivel].min * 60;
+    CH[desafio.nivel].min * 60;
 
-  let r;
-
-  if (d.prazo) {
-    r = Math.ceil(
-      (d.prazo - Date.now()) / 1000
-    );
-  } else {
-    r = Number.isFinite(d.rem)
-      ? Math.floor(d.rem)
+  const restante = desafio.prazo
+    ? Math.ceil(
+        (desafio.prazo - Date.now()) / 1000
+      )
+    : Number.isFinite(desafio.rem)
+      ? Math.floor(desafio.rem)
       : total;
-  }
 
   return Math.min(
     total,
-    Math.max(0, r)
+    Math.max(0, restante)
   );
 }
 
 function formatarTempo(segundos) {
   return `${
-    String(
-      Math.floor(segundos / 60)
-    ).padStart(2, '0')
+    String(Math.floor(segundos / 60)).padStart(2, '0')
   }:${
-    String(
-      segundos % 60
-    ).padStart(2, '0')
+    String(segundos % 60).padStart(2, '0')
   }`;
 }
 
 function draw() {
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
-  if (!d) return;
+  if (!desafio) return;
 
   const total =
-    CH[d.nivel].min * 60;
+    CH[desafio.nivel].min * 60;
 
-  const r = restanteDoDesafio(d);
+  const restante =
+    restanteDoDesafio(desafio);
 
   $('clock').textContent =
-    formatarTempo(r);
+    formatarTempo(restante);
 
   $('ring').style.strokeDasharray = C;
-
   $('ring').style.strokeDashoffset =
-    C * (1 - r / total);
+    C * (1 - restante / total);
 }
 
 function atualizarBotoesTimer() {
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
-  const r = d
-    ? restanteDoDesafio(d)
+  const restante = desafio
+    ? restanteDoDesafio(desafio)
     : 0;
 
   $('pause').textContent =
     running ? 'PAUSAR' : 'RETOMAR';
 
   $('pause').disabled =
-    !d ||
+    !desafio ||
     !coletaLiberada() ||
-    (!running && r <= 0);
+    (!running && restante <= 0);
 
   $('finish').disabled =
-    !d ||
+    !desafio ||
     !podeRegistrar();
 }
 
 function startTimer() {
   if (running) return;
 
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
   if (
-    !d ||
-    d.status !== 'aceito' ||
+    !desafio ||
+    desafio.status !== 'aceito' ||
     !coletaLiberada()
   ) {
     return;
   }
 
-  const r = restanteDoDesafio(d);
+  const restante =
+    restanteDoDesafio(desafio);
 
-  if (r <= 0) {
+  if (restante <= 0) {
     draw();
     atualizarBotoesTimer();
     return;
@@ -2459,9 +2305,9 @@ function startTimer() {
 
   clearInterval(iv);
 
-  d.rem = r;
-  d.prazo =
-    Date.now() + r * 1000;
+  desafio.rem = restante;
+  desafio.prazo =
+    Date.now() + restante * 1000;
 
   running = true;
 
@@ -2476,13 +2322,13 @@ function pauseTimer() {
   clearInterval(iv);
   iv = null;
 
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
-  if (d && d.prazo) {
-    d.rem =
-      restanteDoDesafio(d);
+  if (desafio?.prazo) {
+    desafio.rem =
+      restanteDoDesafio(desafio);
 
-    d.prazo = null;
+    desafio.prazo = null;
     salvarEstado();
   }
 
@@ -2493,9 +2339,9 @@ function pauseTimer() {
 }
 
 function tick() {
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
-  if (!d) {
+  if (!desafio) {
     pauseTimer();
     return;
   }
@@ -2515,36 +2361,32 @@ function tick() {
     return;
   }
 
-  const r =
-    restanteDoDesafio(d);
-
-  if (r <= 0) {
+  if (restanteDoDesafio(desafio) <= 0) {
     pauseTimer();
 
-    concluirDesafio({
-      automatico: true
-    });
+    toast(
+      'Tempo finalizado. Confirme a conclusão do desafio quando estiver pronto.'
+    );
 
+    renderChallenge();
     return;
   }
 
-  d.rem = r;
+  desafio.rem =
+    restanteDoDesafio(desafio);
 
   draw();
   salvarEstado();
 }
 
 function descartarDesafioAtivo() {
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
   pauseTimer();
 
-  if (
-    d &&
-    d.status === 'aceito'
-  ) {
-    d.status = 'nao_concluido';
-    d.prazo = null;
+  if (desafio?.status === 'aceito') {
+    desafio.status = 'nao_concluido';
+    desafio.prazo = null;
   }
 
   S.ativo = null;
@@ -2559,14 +2401,12 @@ function descartarDesafioAtivo() {
   }
 }
 
-function concluirDesafio({
-  automatico = false
-} = {}) {
-  const d = desafioAtivo();
+function concluirDesafio() {
+  const desafio = desafioAtivo();
 
   if (
-    !d ||
-    d.status !== 'aceito'
+    !desafio ||
+    desafio.status !== 'aceito'
   ) {
     return;
   }
@@ -2584,20 +2424,11 @@ function concluirDesafio({
   if (!podeRegistrar()) {
     pauseTimer();
 
-    if (
-      automatico &&
+    toast(
       coletaLiberada()
-    ) {
-      toast(
-        MSG_TEMPO_AGUARDANDO
-      );
-    } else {
-      toast(
-        coletaLiberada()
-          ? MSG_SEM_CONFIRMACAO
-          : MSG_DESAFIO_BLOQUEADO
-      );
-    }
+        ? MSG_SEM_CONFIRMACAO
+        : MSG_DESAFIO_BLOQUEADO
+    );
 
     renderChallenge();
     return;
@@ -2605,21 +2436,21 @@ function concluirDesafio({
 
   pauseTimer();
 
-  d.status = 'concluido';
-  d.rem = 0;
-  d.concluidoEm =
+  desafio.status = 'concluido';
+  desafio.rem = 0;
+  desafio.concluidoEm =
     new Date().toISOString();
 
   S.ativo = null;
 
   salvarEstado();
 
-  const e = estatisticas();
+  const estatistica = estatisticas();
 
   toast(
-    e.concluidos % 3 === 0
-      ? `Desafio concluído! +${d.pontos} pontos e nova medalha!`
-      : `Desafio concluído! +${d.pontos} pontos`
+    estatistica.concluidos % 3 === 0
+      ? `Desafio concluído! +${desafio.pontos} pontos e nova medalha!`
+      : `Desafio concluído! +${desafio.pontos} pontos`
   );
 
   renderChallenge();
@@ -2632,35 +2463,26 @@ function concluirDesafio({
 }
 
 function renderChallenge() {
-  const d = desafioAtivo();
+  const desafio = desafioAtivo();
 
-  const c =
-    CH[
-      d
-        ? d.nivel
-        : nivelDesafioNovo()
-    ];
+  const config = CH[
+    desafio
+      ? desafio.nivel
+      : nivelDesafioNovo()
+  ];
 
-  $('chTag').textContent =
-    c.tag;
-
-  $('chTitle').textContent =
-    c.title;
-
-  $('chText').textContent =
-    c.text;
-
+  $('chTag').textContent = config.tag;
+  $('chTitle').textContent = config.title;
+  $('chText').textContent = config.text;
   $('chPts').textContent =
-    `+${c.pts} pontos`;
+    `+${config.pts} pontos`;
 
   $('chList').innerHTML =
-    c.list.map(k =>
-      `<li class="chip">${ACT[k]}</li>`
+    config.list.map(
+      chave => `<li class="chip">${ACT[chave]}</li>`
     ).join('');
 
-  const liberado =
-    coletaLiberada();
-
+  const liberado = coletaLiberada();
   const dia = diaDoTeste();
 
   const emDia =
@@ -2668,28 +2490,21 @@ function renderChallenge() {
     dia >= 1 &&
     dia <= DIAS_DO_TESTE;
 
-  const jaTemDesafioHoje =
+  const jaTemDesafio =
     emDia &&
     desafiosDoDia(dia).length > 0;
 
   let aviso = '';
 
   if (!liberado) {
-    aviso =
-      textoBloqueio('desafios');
+    aviso = textoBloqueio('desafios');
   } else if (!acessoConfirmado) {
-    aviso =
-      MSG_SEM_CONFIRMACAO;
-  } else if (
-    !d &&
-    jaTemDesafioHoje
-  ) {
-    aviso =
-      MSG_UM_POR_DIA;
+    aviso = MSG_SEM_CONFIRMACAO;
+  } else if (!desafio && jaTemDesafio) {
+    aviso = MSG_UM_POR_DIA;
   }
 
-  $('desafioBloqueioTexto').textContent =
-    aviso;
+  $('desafioBloqueioTexto').textContent = aviso;
 
   $('desafioBloqueio').classList.toggle(
     'hidden',
@@ -2698,45 +2513,41 @@ function renderChallenge() {
 
   $('dia8Aviso').classList.toggle(
     'hidden',
-    !(
-      liberado &&
-      dia === DIAS_DO_TESTE + 1
-    )
+    !(liberado && dia === DIAS_DO_TESTE + 1)
   );
 
   $('chNote').classList.toggle(
     'hidden',
-    !!d || !!nivelHoje()
+    !!desafio || !!nivelHoje()
   );
 
-  const botao = $('accept');
+  $('accept').textContent =
+    desafio
+      ? '✓ DESAFIO ACEITO'
+      : 'ACEITAR DESAFIO';
 
-  botao.textContent = d
-    ? '✓ DESAFIO ACEITO'
-    : 'ACEITAR DESAFIO';
-
-  botao.classList.toggle(
+  $('accept').classList.toggle(
     'done',
-    !!d
+    !!desafio
   );
 
-  botao.disabled =
-    !!d ||
+  $('accept').disabled =
+    !!desafio ||
     !emDia ||
     !acessoConfirmado ||
-    jaTemDesafioHoje;
+    jaTemDesafio;
 
   $('acceptMsg').classList.toggle(
     'hidden',
-    !d
+    !desafio
   );
 
   $('timerBox').classList.toggle(
     'hidden',
-    !d
+    !desafio
   );
 
-  if (d) {
+  if (desafio) {
     draw();
   }
 
@@ -2758,9 +2569,7 @@ $('accept').addEventListener('click', () => {
 
   const dia = diaDoTeste();
 
-  if (
-    dia === DIAS_DO_TESTE + 1
-  ) {
+  if (dia === DIAS_DO_TESTE + 1) {
     toast(MSG_DIA8);
     return;
   }
@@ -2773,25 +2582,19 @@ $('accept').addEventListener('click', () => {
     return;
   }
 
-  if (
-    desafiosDoDia(dia).length > 0
-  ) {
+  if (desafiosDoDia(dia).length) {
     toast(MSG_UM_POR_DIA);
     return;
   }
 
-  const nivel =
-    nivelDesafioNovo();
+  const nivel = nivelDesafioNovo();
+  const registro = registroDoDia(dia);
 
-  const reg =
-    registroDoDia(dia);
-
-  reg.desafios.push({
+  registro.desafios.push({
     nivel,
     status: 'aceito',
     pontos: CH[nivel].pts,
-    aceitoEm:
-      new Date().toISOString(),
+    aceitoEm: new Date().toISOString(),
     concluidoEm: null,
     rem: CH[nivel].min * 60,
     prazo: null
@@ -2799,7 +2602,7 @@ $('accept').addEventListener('click', () => {
 
   S.ativo = {
     dia,
-    idx: reg.desafios.length - 1
+    idx: registro.desafios.length - 1
   };
 
   salvarEstado();
@@ -2827,49 +2630,43 @@ $('finish').addEventListener(
 );
 
 /*
- * PROGRESSO LOCAL
+ * PROGRESSO
  */
+
 function estatisticas() {
   let aceitos = 0;
   let concluidos = 0;
   let pontos = 0;
-  let sequenciaAtual = 0;
+  let sequencia = 0;
   let maiorSequencia = 0;
 
-  for (
-    let n = 1;
-    n <= DIAS_DO_TESTE;
-    n++
-  ) {
-    const lista =
-      desafiosDoDia(n);
+  for (let n = 1; n <= DIAS_DO_TESTE; n++) {
+    const lista = desafiosDoDia(n);
 
-    const feitos =
-      lista.filter(
-        d => d.status === 'concluido'
-      );
+    const feitos = lista.filter(
+      desafio => desafio.status === 'concluido'
+    );
 
     aceitos += lista.filter(
-      d =>
-        d.status !== 'nao_concluido'
+      desafio => desafio.status !== 'nao_concluido'
     ).length;
 
     concluidos += feitos.length;
 
     pontos += feitos.reduce(
-      (soma, d) =>
-        soma + (d.pontos || 0),
+      (soma, desafio) =>
+        soma + (desafio.pontos || 0),
       0
     );
 
     if (feitos.length) {
-      sequenciaAtual++;
+      sequencia++;
       maiorSequencia = Math.max(
         maiorSequencia,
-        sequenciaAtual
+        sequencia
       );
     } else {
-      sequenciaAtual = 0;
+      sequencia = 0;
     }
   }
 
@@ -2881,13 +2678,12 @@ function estatisticas() {
   };
 }
 
-function pctDia(n) {
-  const lista =
-    desafiosDoDia(n);
+function pctDia(dia) {
+  const lista = desafiosDoDia(dia);
 
   if (
     lista.some(
-      d => d.status === 'concluido'
+      desafio => desafio.status === 'concluido'
     )
   ) {
     return 100;
@@ -2895,7 +2691,7 @@ function pctDia(n) {
 
   if (
     lista.some(
-      d => d.status === 'aceito'
+      desafio => desafio.status === 'aceito'
     )
   ) {
     return 30;
@@ -2905,108 +2701,75 @@ function pctDia(n) {
 }
 
 function renderProgress() {
-  const e = estatisticas();
+  const estatistica = estatisticas();
 
-  $('stPts').textContent =
-    e.pontos;
-
-  $('stAcc').textContent =
-    e.aceitos;
-
-  $('stDone').textContent =
-    e.concluidos;
-
-  $('stStreak').textContent =
-    e.sequencia;
+  $('stPts').textContent = estatistica.pontos;
+  $('stAcc').textContent = estatistica.aceitos;
+  $('stDone').textContent = estatistica.concluidos;
+  $('stStreak').textContent = estatistica.sequencia;
 
   $('progressoVazio').classList.toggle(
     'hidden',
-    e.aceitos > 0
+    estatistica.aceitos > 0
   );
 
   const dia = diaDoTeste();
 
   const hoje =
-    dia !== null &&
-    dia >= 1
-      ? Math.min(
-          dia,
-          DIAS_DO_TESTE
-        )
+    dia !== null && dia >= 1
+      ? Math.min(dia, DIAS_DO_TESTE)
       : 0;
 
-  const inicio =
-    dataInicioTeste();
+  const inicio = dataInicioTeste();
 
-  $('week').innerHTML =
-    Array.from(
-      { length: DIAS_DO_TESTE },
-      (_, i) => {
-        const n = i + 1;
-        const p = pctDia(n);
+  $('week').innerHTML = Array.from(
+    { length: DIAS_DO_TESTE },
+    (_, i) => {
+      const numero = i + 1;
+      const percentual = pctDia(numero);
 
-        const data = inicio
-          ? formatarDataCurta(
-              somarDias(inicio, i)
-            )
-          : 'data a definir';
+      const data = inicio
+        ? formatarDataCurta(somarDias(inicio, i))
+        : 'data a definir';
 
-        const destaque =
-          n === hoje
-            ? 'bg-brand/5'
-            : '';
+      const destaque =
+        numero === hoje ? 'bg-brand/5' : '';
 
-        const rotulo =
-          n === hoje
-            ? 'font-extrabold text-brand'
-            : 'font-semibold';
+      const rotulo =
+        numero === hoje
+          ? 'font-extrabold text-brand'
+          : 'font-semibold';
 
-        const apagado =
-          hoje > 0 &&
-          n > hoje
-            ? 'opacity-50'
-            : '';
+      const apagado =
+        hoje > 0 && numero > hoje
+          ? 'opacity-50'
+          : '';
 
-        return `
-          <div class="flex items-center gap-3 rounded-xl px-2 py-1 ${destaque} ${apagado}">
-            <span class="w-24 text-sm ${rotulo}">
-              Dia ${n}
-              <br>
-              <span class="text-xs font-normal text-slate-500">
-                ${data}
-              </span>
-            </span>
-
-            <div class="bar flex-1">
-              <div class="fill bg-go" data-w="${p}"></div>
-            </div>
-
-            <span class="w-10 text-right text-sm font-bold">
-              ${p}%
-            </span>
+      return `
+        <div class="flex items-center gap-3 rounded-xl px-2 py-1 ${destaque} ${apagado}">
+          <span class="w-24 text-sm ${rotulo}">
+            Dia ${numero}
+            <br>
+            <span class="text-xs font-normal text-slate-500">${data}</span>
+          </span>
+          <div class="bar flex-1">
+            <div class="fill bg-go" data-w="${percentual}"></div>
           </div>
-        `;
-      }
-    ).join('');
+          <span class="w-10 text-right text-sm font-bold">${percentual}%</span>
+        </div>
+      `;
+    }
+  ).join('');
 
-  const valores = [];
-
-  for (
-    let n = 1;
-    n <= hoje;
-    n++
-  ) {
-    valores.push(
-      pctDia(n)
-    );
-  }
+  const valores = Array.from(
+    { length: hoje },
+    (_, i) => pctDia(i + 1)
+  );
 
   const media = valores.length
     ? Math.round(
-        valores.reduce(
-          (a, b) => a + b,
-          0
-        ) / valores.length
+        valores.reduce((a, b) => a + b, 0)
+        / valores.length
       )
     : 0;
 
@@ -3014,23 +2777,21 @@ function renderProgress() {
     `${media}%`;
 
   const falta =
-    3 - (e.concluidos % 3);
+    3 - (estatistica.concluidos % 3);
 
   $('nextText').textContent =
     `Complete mais ${falta} ${
-      falta === 1
-        ? 'desafio'
-        : 'desafios'
+      falta === 1 ? 'desafio' : 'desafios'
     } para desbloquear uma nova medalha.`;
 
   $('nextBar').style.width = '0';
 
   let nota =
-    'Este progresso fica guardado somente neste aparelho, separado por identidade. A gravação definitiva no servidor será implementada em uma próxima etapa. Desafios de dias anteriores não concluídos permanecem no histórico.';
+    'Os check-ins confirmados ficam guardados no Supabase. Desafios e progresso dos desafios ainda são armazenados somente neste aparelho.';
 
   if (!inicio) {
     nota +=
-      ' A data oficial do teste ainda não foi definida, por isso nenhum dia é contabilizado.';
+      ' A data oficial do teste ainda não foi definida.';
   }
 
   if (!acessoConfirmado) {
@@ -3038,17 +2799,14 @@ function renderProgress() {
       ' Sem confirmação do servidor agora, novos registros estão bloqueados.';
   }
 
-  $('progressoNota').textContent =
-    nota;
+  $('progressoNota').textContent = nota;
 
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      $$('#week .fill').forEach(
-        f => {
-          f.style.width =
-            f.dataset.w + '%';
-        }
-      );
+      $$('#week .fill').forEach(elemento => {
+        elemento.style.width =
+          elemento.dataset.w + '%';
+      });
 
       $('nextBar').style.width =
         ((3 - falta) / 3 * 100) + '%';
@@ -3057,13 +2815,13 @@ function renderProgress() {
 }
 
 /*
- * BOTÕES DE ESPERA E BLOQUEIO
+ * EVENTOS FINAIS
  */
+
 $('esperaVerificar').addEventListener(
   'click',
   async () => {
-    const botao =
-      $('esperaVerificar');
+    const botao = $('esperaVerificar');
 
     botao.disabled = true;
 
@@ -3078,8 +2836,7 @@ $('esperaVerificar').addEventListener(
 $('bloqueioVerificar').addEventListener(
   'click',
   async () => {
-    const botao =
-      $('bloqueioVerificar');
+    const botao = $('bloqueioVerificar');
 
     botao.disabled = true;
 
@@ -3091,39 +2848,25 @@ $('bloqueioVerificar').addEventListener(
   }
 );
 
-/*
- * FORMULÁRIO DE ENTRADA
- */
-$('nameInput').addEventListener(
-  'input',
-  () => {
-    $('nameErr').textContent = '';
-  }
-);
+$('nameInput').addEventListener('input', () => {
+  $('nameErr').textContent = '';
+});
 
-$('nameStep').addEventListener(
-  'submit',
-  e => {
-    e.preventDefault();
-    enviarSolicitacao();
-  }
-);
+$('nameStep').addEventListener('submit', evento => {
+  evento.preventDefault();
+  enviarSolicitacao();
+});
 
-/*
- * INICIALIZAÇÃO
- */
 function criarNotaProgresso() {
-  const nota =
-    document.createElement('p');
+  if ($('progressoNota')) return;
+
+  const nota = document.createElement('p');
 
   nota.id = 'progressoNota';
-
   nota.className =
     'mt-4 text-xs text-slate-500';
 
-  $('progress').appendChild(
-    nota
-  );
+  $('progress').appendChild(nota);
 }
 
 async function iniciar() {
@@ -3135,36 +2878,29 @@ async function iniciar() {
 
   try {
     await iniciarCliente();
-  } catch (err) {
+  } catch {
     mostrarFormulario(
       'Não foi possível conectar agora. Atualize a página e tente novamente.'
     );
-
     return;
   }
 
   let sessao = null;
 
   try {
-    sessao =
-      await sessaoLocal();
-  } catch (err) {
+    sessao = await sessaoLocal();
+  } catch {
     sessao = null;
   }
 
   if (sessao) {
-    carregarEstado(
-      sessao.user.id
-    );
-
+    carregarEstado(sessao.user.id);
     await verificarAgora();
     return;
   }
 
   setTimeout(() => {
-    $('brandStep').classList.add(
-      'out'
-    );
+    $('brandStep').classList.add('out');
   }, 2500);
 
   setTimeout(() => {
