@@ -2,12 +2,12 @@
 /*
  * Fair Play - Netlify Function: verificar-gestor
  *
- * 1. Valida o token do usuário no Supabase Auth.
- * 2. Confirma se o usuário está cadastrado em public.gestores.
- * 3. Libera o acesso somente para gestores autorizados.
+ * 1. Valida o token no Supabase Auth.
+ * 2. Confirma o cadastro em public.gestores.
+ * 3. Autoriza somente gestores cadastrados.
  *
  * Ambiente exclusivo de TESTES.
- * A SUPABASE_SECRET_KEY permanece no servidor.
+ * A chave secreta permanece no servidor.
  */
 
 import { lerAmbienteSupabase } from "../lib/ambiente.mjs";
@@ -30,7 +30,7 @@ const REGEX_UUID =
 const REGEX_TOKEN = /^[A-Za-z0-9._-]+$/;
 
 /*
- * 1. EXTRAIR TOKEN DO USUÁRIO
+ * 1. EXTRAIR TOKEN DE AUTENTICACAO
  */
 function extrairToken(headers = {}) {
   const cabecalho = (
@@ -61,7 +61,7 @@ function extrairToken(headers = {}) {
 }
 
 /*
- * 2. REQUISIÇÕES COM TEMPO LIMITE
+ * 2. REQUISICOES COM TEMPO LIMITE
  */
 async function fetchComTimeout(
   url,
@@ -85,7 +85,60 @@ async function fetchComTimeout(
 }
 
 /*
- * 3. FUNÇÃO PRINCIPAL
+ * 3. PROTEGER INFORMACOES NOS LOGS
+ *
+ * Oculta formatos conhecidos de chaves,
+ * tokens e URLs em mensagens de erro.
+ */
+function mensagemSegura(erro) {
+  const mensagem = String(
+    erro?.message || "Mensagem nao informada"
+  );
+
+  return mensagem
+    .replace(
+      /sb_(?:secret|publishable)_[A-Za-z0-9_-]+/g,
+      "[CHAVE]"
+    )
+    .replace(
+      /Bearer\s+[A-Za-z0-9._-]+/gi,
+      "Bearer [TOKEN]"
+    )
+    .replace(
+      /eyJ[A-Za-z0-9._-]{20,}/g,
+      "[JWT]"
+    )
+    .replace(
+      /https?:\/\/[^\s"'`]+/g,
+      "[URL]"
+    )
+    .slice(0, 180);
+}
+
+/*
+ * 4. REGISTRAR ERRO PARA DIAGNOSTICO
+ *
+ * Nao inclui valores das variaveis de ambiente.
+ */
+function registrarErro(etapa, erro) {
+  console.error(
+    "verificar-gestor: diagnostico",
+    {
+      etapa,
+      tipo: erro?.name || "Erro",
+      mensagem: mensagemSegura(erro),
+      codigo: String(
+        erro?.code || "nao_informado"
+      ).slice(0, 60),
+      codigoDaCausa: String(
+        erro?.cause?.code || "nao_informado"
+      ).slice(0, 60)
+    }
+  );
+}
+
+/*
+ * 5. FUNCAO PRINCIPAL
  */
 export const handler = async (event) => {
 
@@ -97,15 +150,13 @@ export const handler = async (event) => {
   }
 
   /*
-   * 4. VALIDAR AMBIENTE DO SUPABASE
-   *
-   * Somente o Supabase de TESTES é permitido.
+   * 6. VALIDAR AMBIENTE DE TESTE
    */
   const ambiente = lerAmbienteSupabase();
 
   if (ambiente.erro) {
     console.error(
-      "verificar-gestor: ambiente inválido.",
+      "verificar-gestor: ambiente invalido.",
       ambiente.erro
     );
 
@@ -125,8 +176,8 @@ export const handler = async (event) => {
   ).trim();
 
   /*
-   * Impede configurações ausentes ou que
-   * utilizem a chave secreta no campo público.
+   * Recusa configuracao ausente ou uso
+   * indevido da chave secreta no campo publico.
    */
   const chavesInvalidas =
     !chavePublicavel ||
@@ -136,7 +187,7 @@ export const handler = async (event) => {
 
   if (chavesInvalidas) {
     console.error(
-      "verificar-gestor: configuração das chaves inválida."
+      "verificar-gestor: configuracao das chaves invalida."
     );
 
     return resposta(500, {
@@ -145,9 +196,11 @@ export const handler = async (event) => {
   }
 
   /*
-   * 5. EXTRAIR TOKEN
+   * 7. EXTRAIR TOKEN
    */
-  const token = extrairToken(event.headers);
+  const token = extrairToken(
+    event.headers
+  );
 
   if (!token) {
     return resposta(401, {
@@ -156,18 +209,22 @@ export const handler = async (event) => {
   }
 
   /*
-   * 6. VALIDAR TOKEN NO SUPABASE AUTH
+   * 8. VALIDAR TOKEN NO SUPABASE AUTH
    */
   let usuarioId;
+  let etapaAuth = "preparar_auth";
 
   try {
+    etapaAuth = "consultar_auth";
+
     const r = await fetchComTimeout(
       `${url}/auth/v1/user`,
       {
         method: "GET",
         headers: {
           apikey: chavePublicavel,
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json"
         }
       }
     );
@@ -183,7 +240,8 @@ export const handler = async (event) => {
 
     if (!r.ok) {
       console.error(
-        `verificar-gestor: Supabase Auth respondeu ${r.status}.`
+        "verificar-gestor: Supabase Auth HTTP",
+        r.status
       );
 
       return resposta(500, {
@@ -191,13 +249,16 @@ export const handler = async (event) => {
       });
     }
 
+    etapaAuth = "ler_resposta_auth";
+
     const usuario = await r.json();
 
     usuarioId = usuario?.id;
 
   } catch (err) {
-    console.error(
-      `verificar-gestor: falha ao validar token (${err.name || "Erro"}).`
+    registrarErro(
+      etapaAuth,
+      err
     );
 
     return resposta(500, {
@@ -206,7 +267,7 @@ export const handler = async (event) => {
   }
 
   /*
-   * 7. CONFERIR ID DO USUÁRIO
+   * 9. VALIDAR ID DO USUARIO
    */
   if (
     !usuarioId ||
@@ -218,11 +279,13 @@ export const handler = async (event) => {
   }
 
   /*
-   * 8. CONSULTAR PUBLIC.GESTORES
+   * 10. CONSULTAR PUBLIC.GESTORES
    *
-   * Somente o servidor utiliza a chave secreta.
-   * O UID foi obtido do token autenticado.
+   * Apenas o servidor utiliza a chave secreta.
+   * A consulta usa o UID validado pelo Auth.
    */
+  let etapaGestores = "preparar_consulta";
+
   try {
     const consulta = new URL(
       `${url}/rest/v1/gestores`
@@ -243,6 +306,11 @@ export const handler = async (event) => {
       "1"
     );
 
+    /*
+     * ETAPA A: Enviar consulta ao Supabase.
+     */
+    etapaGestores = "requisicao_rest";
+
     const r = await fetchComTimeout(
       consulta.toString(),
       {
@@ -254,9 +322,15 @@ export const handler = async (event) => {
       }
     );
 
+    /*
+     * ETAPA B: Verificar resposta HTTP.
+     */
+    etapaGestores = "validar_status_rest";
+
     if (!r.ok) {
       console.error(
-        `verificar-gestor: consulta a gestores respondeu ${r.status}.`
+        "verificar-gestor: consulta a gestores HTTP",
+        r.status
       );
 
       return resposta(500, {
@@ -264,7 +338,17 @@ export const handler = async (event) => {
       });
     }
 
+    /*
+     * ETAPA C: Ler a resposta JSON.
+     */
+    etapaGestores = "ler_json_rest";
+
     const linhas = await r.json();
+
+    /*
+     * ETAPA D: Confirmar cadastro do gestor.
+     */
+    etapaGestores = "validar_cadastro";
 
     if (
       !Array.isArray(linhas) ||
@@ -276,13 +360,14 @@ export const handler = async (event) => {
     }
 
   } catch (err) {
-    
-console.error("verificar-gestor: erro na consulta", {
-  tipo: err?.name || "Erro",
-  falhaDeRede: err?.message === "fetch failed",
-  codigoDaCausa: err?.cause?.code || "nao_informado"
-});
-  
+    /*
+     * Diagnostico detalhado do erro.
+     * Nao devolve dados sensiveis ao navegador.
+     */
+    registrarErro(
+      etapaGestores,
+      err
+    );
 
     return resposta(500, {
       erro: "Não foi possível verificar o acesso."
@@ -290,7 +375,7 @@ console.error("verificar-gestor: erro na consulta", {
   }
 
   /*
-   * 9. GESTOR AUTORIZADO
+   * 11. GESTOR AUTORIZADO
    */
   return resposta(200, {
     autorizado: true
