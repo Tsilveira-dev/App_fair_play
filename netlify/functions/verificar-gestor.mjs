@@ -276,9 +276,13 @@ export const handler = async (event) => {
     }
 
   } catch (err) {
-    console.error(
-      `verificar-gestor: falha ao consultar gestores (${err.name || "Erro"}).`
-    );
+    
+console.error("verificar-gestor: erro na consulta", {
+  tipo: err?.name || "Erro",
+  falhaDeRede: err?.message === "fetch failed",
+  codigoDaCausa: err?.cause?.code || "nao_informado"
+});
+  
 
     return resposta(500, {
       erro: "Não foi possível verificar o acesso."
