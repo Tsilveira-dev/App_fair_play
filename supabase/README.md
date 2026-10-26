@@ -9,6 +9,8 @@ Estes arquivos **não foram executados em Supabase externo**. A validação usa 
 
 Ambos usam transações e podem ser reaplicados após instalação bem-sucedida. Falhas devem causar rollback, sem apagar ou corrigir dados automaticamente. Os testes confirmam que a baseline interrompe em banco preexistente sem alterar seus registros.
 
+O arquivo [inspecionar_esquema.sql](inspecionar_esquema.sql) reúne consultas somente de metadados para auxiliar a comparação no SQL Editor de TESTE. Não consulta registros da pesquisa.
+
 ## Procedimento de revisão
 
 1. Confirme o projeto pelo painel e a URL. TESTE é `jzxltkjxdefuptutpkfx`. O ORIGINAL deve ter outra referência. Não execute comandos recebidos nesta entrega no ORIGINAL sem aprovação específica.

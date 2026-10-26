@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Fair Play: instalar dependências",
+      "type": "shell",
+      "command": "npm ci",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fair Play: preparar configuração local",
+      "type": "shell",
+      "command": "npm run preparar:local",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fair Play: preparar projeto",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Fair Play: instalar dependências", "Fair Play: preparar configuração local"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fair Play: validar código e testes",
+      "type": "shell",
+      "command": "npm run check",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fair Play: conferir configuração de TESTE",
+      "type": "shell",
+      "command": "npm run verificar:ambiente",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Fair Play: conferir deploy de TESTE",
+      "type": "process",
+      "command": "node",
+      "args": ["--use-env-proxy", "scripts/verificar-deploy.mjs", "${input:urlTeste}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "urlTeste",
+      "type": "promptString",
+      "description": "URL HTTPS raiz do deploy Vercel de TESTE"
+    }
+  ]
+}

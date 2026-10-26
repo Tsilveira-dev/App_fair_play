@@ -1,5 +1,7 @@
 # Implantação na Vercel
 
+Para executar a preparação no editor e configurar o painel, siga [VS Code e Vercel](VS_CODE_VERCEL.md).
+
 O código está preparado para implantação. Nenhum projeto Vercel foi conectado e nenhum banco externo foi alterado por esta entrega. A integração Netlify preexistente cria previews automaticamente ao abrir/atualizar o PR, inclusive no projeto fairplay-app; a trava CONTEXT/HEAD bloqueia ORIGINAL nesses previews. A produção em main não foi alterada.
 
 ## TESTE primeiro

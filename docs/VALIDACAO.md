@@ -41,7 +41,7 @@ Todas têm entradas `/api/<nome>` e compatibilidade `/.netlify/functions/<nome>`
 
 ## Evidências e limites
 
-`npm run check` passou com **97 testes, zero falhas e zero ignorados**, após reinstalação com `npm ci`. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
+`npm run check` passou com **102 testes, zero falhas e zero ignorados**, após reinstalação com `npm ci`. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
 
 Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegador gráfico: layout responsivo, renderização de fontes/CDNs e teste em celular ainda exigem aceitação no ambiente TESTE publicado. O esquema externo não foi inspecionado, porque faltam as chaves de TESTE. Nenhuma conexão, execução SQL ou publicação ORIGINAL faz parte da validação realizada.
 
@@ -52,3 +52,5 @@ Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegado
 3. Autorizar conexão ao projeto Vercel de TESTE e validar login, autorização, persistência e recarga no domínio publicado e em celular.
 4. Confirmar com o responsável os textos que o código identifica como rascunho/proposta antes da coleta.
 5. Aprovar separadamente PR/integração à `main`, migrações no ORIGINAL e publicação ORIGINAL, nessa ordem.
+
+O projeto também inclui tarefas VS Code (preparação, testes, F5 e conferência do deploy), criação idempotente de `.env.local`, validação de configuração TESTE e conferência HTTP sem credenciais. O relatório SQL de esquema é somente leitura. Esses recursos não executam migração remota ou deploy automaticamente.

@@ -3,12 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": "24.x" },
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "node --use-env-proxy --env-file-if-exists=.env.local scripts/dev.mjs",
     "build": "node scripts/validate.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test",
+    "preparar:local": "node scripts/preparar-local.mjs",
+    "verificar:ambiente": "node --env-file-if-exists=.env.local scripts/verificar-ambiente.mjs",
+    "verificar:deploy": "node --use-env-proxy scripts/verificar-deploy.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.11",

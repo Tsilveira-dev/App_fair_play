@@ -13,6 +13,7 @@ test('PostgreSQL isolado: migrações, privacidade, duplicidade e pontuação',a
   const protecao=await readFile('supabase/migrations/002_protecao.sql','utf8');
   await pg.exec(baseline); await pg.exec(protecao);
   await pg.exec(baseline); await pg.exec(protecao);
+  await pg.exec(await readFile('supabase/inspecionar_esquema.sql','utf8'));
   await t.test('migrações repetíveis, sem participantes ou dados de TESTE',async()=>{
     assert.equal((await pg.query('select count(*) as n from public.participantes')).rows[0].n,0);
     assert.equal((await pg.query('select count(*) as n from public.fairplay_schema_migrations')).rows[0].n,2);
