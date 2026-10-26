@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { UID, PARTICIPANTE } from './helpers/supabase.mjs';
+import { UID, GESTOR, PARTICIPANTE, SESSAO } from './helpers/supabase.mjs';
 const baseline=await readFile('supabase/migrations/001_schema.sql','utf8');
 const antes002=await readFile('supabase/original/000_pre_002.sql','utf8');
 const protecao=await readFile('supabase/migrations/002_protecao.sql','utf8');
@@ -120,4 +120,39 @@ test('plano ORIGINAL isolado: grants da visão normalizados sem alterar defaults
   assert.deepEqual((await pg.query("select pg_get_viewdef('public.fairplay_pontuacao'::regclass) as v")).rows,definicao);
   await pg.exec('create table public.fixture_default_preservado(id integer)');
   assert.equal((await pg.query("select has_table_privilege('service_role','public.fixture_default_preservado','DELETE') as d")).rows[0].d,true);
+});
+
+test('ORIGINAL com pré-requisito aplicado: 002 → grants → verificação preserva 3 participantes, gestor, sessão e Auth',async t=>{
+  const pg=await fixture(t);
+  await pg.exec(antes002); // Estado inicial reproduzido somente em memória, uma única vez.
+  await pg.exec(`alter table auth.users add column encrypted_password text;
+    create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id),criado_em timestamptz);
+    create table auth.identities(id uuid primary key,user_id uuid references auth.users(id),provider text);`);
+  await pg.query(`insert into auth.users(id,email,is_anonymous,raw_app_meta_data,encrypted_password)
+    values($1,'gestor@example.invalid',false,'{"provider":"email"}','sentinela-local-sem-credencial')`,[GESTOR]);
+  await pg.query('insert into public.gestores(usuario_auth_id) values($1)',[GESTOR]);
+  await pg.exec(`insert into public.participantes(nome,nome_chave) values('FicticioB','ficticiob'),('FicticioC','ficticioc');
+    insert into public.configuracao_teste values(1,(now() at time zone 'America/Fortaleza')::date-20,false);`);
+  await pg.query(`insert into public.sessoes_participantes(id,participante_id,usuario_auth_id,status,tipo_dispositivo,
+      autorizado_por,autorizado_em,expira_em)
+    values($1,$2,$3,'aprovada','individual',$4,now()-interval '20 days',now()-interval '10 days')`,[SESSAO,PARTICIPANTE,UID,GESTOR]);
+  await pg.query('insert into auth.sessions values($1,$2,now())',[SESSAO,GESTOR]);
+  await pg.query("insert into auth.identities values($1,$2,'email')",[GESTOR,GESTOR]);
+  const tabelas=['auth.users','auth.sessions','auth.identities','public.gestores','public.participantes',
+    'public.sessoes_participantes','public.configuracao_teste','public.checkins','public.desafios_registros',
+    'public.solicitacoes_tentativas'];
+  const snapshot=async()=>Object.fromEntries(await Promise.all(tabelas.map(async nome=>
+    [nome,(await pg.query(`select * from ${nome} order by 1`)).rows])));
+  const antes=await snapshot();
+  assert.equal(antes['public.participantes'].length,3);
+  assert.equal(antes['public.gestores'].length,1);assert.equal(antes['public.sessoes_participantes'].length,1);
+  const eventos=await metadados(pg);
+  await pg.exec(protecao);
+  assert.equal((await pg.query('select estado from public.fairplay_migration_002_backup where id=1')).rows[0].estado,'aplicada');
+  await pg.exec(grantsVisao);await pg.exec(verificar);
+  assert.deepEqual(await snapshot(),antes); // Inclui UID, vínculo, senha sentinela e sessão expirada, sem renovação.
+  assert.deepEqual(await metadados(pg),eventos);
+  await assert.rejects(pg.transaction(async tx=>{
+    await tx.exec('set local role authenticated');await tx.exec('select * from public.participantes');
+  }),/permission denied/);
 });

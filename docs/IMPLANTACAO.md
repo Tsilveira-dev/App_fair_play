@@ -29,7 +29,7 @@ O frontend usa jsDelivr para Supabase JS 2.45.4, Tailwind CDN e Google Fonts, pr
 
 ## ORIGINAL — executar somente com aprovação explícita
 
-O roteiro completo e o checklist mínimo estão em [Plano ORIGINAL](ORIGINAL.md), incluindo tabela de tentativas antes da 002, grants, índices, event triggers e configuração Vercel `main`/Production com banco ORIGINAL. O ORIGINAL existente tem oito tabelas e RLS ativo conforme inspeção administrativa; não executar a baseline 001.
+O roteiro completo e o checklist mínimo estão em [Plano ORIGINAL](ORIGINAL.md), partindo de 000 já aplicada: confirmar estado da tentativa bloqueada e recuperação restaurável; executar somente 002 → 002b → 003, com verificações e tratamento de erros. Contratos/UNIQUEs já conferidos; 3 participantes, gestor e sessão preservados. Não reaplicar 000/001 ou migrações no TESTE. O projeto Vercel ORIGINAL ainda não existe; o roteiro define `main`, Production exclusivo e os acessos existentes, sem recriá-los.
 
 A preparação não executa SQL, integra o PR ou publica. Autorizar essas ações separadamente após a aceitação do TESTE. Não copiar dados/contas fictícias nem credenciais entre ambientes.
 

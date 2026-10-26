@@ -37,7 +37,11 @@ A reversão também restaura as permissões antigas, que podem ser mais amplas; 
 
 ## ORIGINAL
 
-A integração administrativa do ChatGPT confirmou a inspeção somente de metadados: oito tabelas iniciais, RLS ativo e índice pendente/aprovada; faltam tabela `solicitacoes_tentativas`, RPC e visão. O Codex recebeu esse resumo sem consultar/modificar o ORIGINAL. O plano para o banco existente está em [Implantação ORIGINAL](../docs/ORIGINAL.md): `original/000_pre_002.sql` → `migrations/002_protecao.sql` → `original/002b_grants_visao.sql` → revisão condicional de ACL/event triggers → `original/003_verificar.sql` (somente leitura). Não executar baseline 001. A sequência foi testada apenas em PGlite e não foi aplicada ao ORIGINAL. Não copie participantes, contas Auth, sessões, respostas, desafios, tentativas ou backups do TESTE. A execução no ORIGINAL, a integração à `main` e sua publicação continuam dependendo da validação final do responsável.
+A integração administrativa confirmou `000_pre_002.sql` já aplicada no ORIGINAL, tabela de tentativas com RLS, contratos de colunas/UNIQUEs conferidos e 3 participantes/1 gestor/1 sessão preservados. A aplicação da 002 foi bloqueada sem confirmação de execução. Não reaplicar 000, não executar baseline 001 e não repetir migrações no TESTE.
+
+O [roteiro restante](../docs/ORIGINAL.md) confirma o estado da tentativa em leitura e prepara somente `migrations/002_protecao.sql` → `original/002b_grants_visao.sql` → `original/003_verificar.sql`. O último arquivo é somente leitura; qualquer erro interrompe a sequência para revisão. A 002 original permanece inalterada e compatível com os contratos informados; sete testes PGlite modelam o plano, incluindo preservação dos vínculos/Auth fictícios. O Codex não executou SQL hospedado.
+
+Há cópia parcial, **não um backup integral restaurável de Auth/PostgreSQL**. A tabela privada de backup da migração contém somente metadados; reversão seletiva não recupera usuários/senhas/dados perdidos. Resolver a recuperação antes da liberação definitiva. Vercel ORIGINAL não criado; merge/SQL/publicação exigem confirmação administrativa e aprovação. Não copiar contas ou dados do TESTE.
 
 ## ACL da função legada `rls_auto_enable()`
 

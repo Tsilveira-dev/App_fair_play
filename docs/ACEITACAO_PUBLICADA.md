@@ -48,7 +48,7 @@ A correção pontual `supabase/restringir_rls_auto_enable.sql` revoga somente EX
 
 A correção foi preparada e validada localmente pelo Codex e **já foi aplicada e validada no TESTE pela integração administrativa do ChatGPT**, conforme informado pelo responsável. Não é pendência do TESTE. Não há confirmação de aplicação no ORIGINAL. O teste PostgreSQL confirmou que CREATE TABLE por uma role sem EXECUTE continuou acionando o event trigger e habilitando RLS.
 
-A consulta `supabase/inspecionar_esquema.sql` foi ampliada para comparar apenas metadados: colunas, constraints, índices, RLS, grants, policies, assinaturas/hashes e opções da visão. A integração administrativa já inspecionou os metadados do ORIGINAL `swbwbkslcotoecjlbqxe`, somente em leitura: oito tabelas iniciais, RLS ativo e UNIQUE pendente/aprovada; faltam tabela de tentativas, RPC e visão. O Codex recebeu esse resumo sem executar consultas próprias no ORIGINAL. Ver [estado dos bancos](ESTADO_BANCOS.md) e [plano incremental](ORIGINAL.md).
+A consulta `supabase/inspecionar_esquema.sql` foi ampliada para comparar apenas metadados: colunas, constraints, índices, RLS, grants, policies, assinaturas/hashes e opções da visão. A integração administrativa inspecionou os metadados do ORIGINAL `swbwbkslcotoecjlbqxe`, conferiu contratos/UNIQUEs e depois aplicou 000: tabela de tentativas com RLS e 3 participantes/1 gestor/1 sessão preservados. A 002 foi tentada e bloqueada sem confirmação de execução; não presumir RPC/visão instaladas ou ausentes sem conferir o estado. O Codex recebeu essas confirmações sem executar consultas próprias no ORIGINAL. Ver [estado dos bancos](ESTADO_BANCOS.md) e [plano incremental](ORIGINAL.md).
 
 ## Atualização de 26/10/2026 — mensagens e Progresso
 
@@ -76,3 +76,10 @@ O Codex ajustou exclusivamente a apresentação do cartão: fonte de 22 px no t�
 **Automação:** `npm run check` passa a abranger 125 testes, incluindo seis novos testes PostgreSQL do plano ORIGINAL. Eles modelam as características administrativas informadas, sem copiar dados externos: pré-requisito vazio, preservação de registros/índice/event trigger, grants mínimos, RPC, verificação somente leitura, rollback em incompatibilidades e defaults amplos da visão. Não houve execução SQL hospedada.
 
 O [estado confirmado dos bancos](ESTADO_BANCOS.md) distingue observações do Codex das confirmações administrativas. O [plano ORIGINAL](ORIGINAL.md) inclui a tabela ausente antes da 002, revisão de grants/índices/event triggers e configuração Vercel `main` com credenciais exclusivas de Production. Está preparado para revisão, **não executado**. O PR #1 continua em rascunho; `main` e ORIGINAL não foram alterados.
+
+
+## Atualização administrativa — 000 ORIGINAL concluída
+
+O responsável confirmou a aplicação de 000 no ORIGINAL, tentativas com RLS, contratos/UNIQUEs conferidos e preservação de 3 participantes, 1 gestor e 1 sessão. A tentativa administrativa da 002 foi bloqueada sem confirmação de execução. A cópia disponível é parcial, sem backup integral restaurável de Auth/PostgreSQL. Estas informações atualizam o histórico anterior; não houve SQL hospedado do Codex.
+
+A revisão mantém a 002 inalterada e prepara somente a sequência restante **002 → 002b → 003**, com consulta de estado, verificações por etapa e interrupção em erro em [ORIGINAL](ORIGINAL.md). Não repetir 000/001 ou migrações no TESTE. Um sétimo teste do plano em PGlite compara Auth/identidades/sessões fictícios e os vínculos 3/1/1 antes/depois; a suíte totaliza 126 testes. Layout, catálogo e código da aplicação não mudaram, portanto a inspeção gráfica já aprovada não foi repetida. Vercel ORIGINAL não criado e main sem alteração.
