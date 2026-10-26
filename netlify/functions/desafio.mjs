@@ -281,43 +281,83 @@ async function listarDesafios(cfg, participanteId) {
   );
 }
 
-async function determinarNivel(
-  cfg,
-  participanteId,
-  dia
-) {
+/* Catálogo 2026.1 — códigos por dia e nível. */
+const CODIGOS_DESAFIOS = {
+  1: {
+    baixo: 'D01_BAIXO_ROTINA',
+    moderado: 'D01_MODERADO_PAUSA',
+    alto: 'D01_ALTO_ATIVIDADE',
+    neutro: 'D01_NEUTRO'
+  },
+  2: {
+    baixo: 'D02_BAIXO_ORGANIZACAO',
+    moderado: 'D02_MODERADO_FOCO',
+    alto: 'D02_ALTO_ETAPAS',
+    neutro: 'D02_NEUTRO'
+  },
+  3: {
+    baixo: 'D03_BAIXO_HORARIO',
+    moderado: 'D03_MODERADO_DESCANSO',
+    alto: 'D03_ALTO_SEM_TELAS',
+    neutro: 'D03_NEUTRO'
+  },
+  4: {
+    baixo: 'D04_BAIXO_PAUSA',
+    moderado: 'D04_MODERADO_ALONGAMENTO',
+    alto: 'D04_ALTO_OUTRA_ATIVIDADE',
+    neutro: 'D04_NEUTRO'
+  },
+  5: {
+    baixo: 'D05_BAIXO_LAZER',
+    moderado: 'D05_MODERADO_ATIVIDADE',
+    alto: 'D05_ALTO_SEM_JOGOS',
+    neutro: 'D05_NEUTRO'
+  },
+  6: {
+    baixo: 'D06_BAIXO_EMOCOES',
+    moderado: 'D06_MODERADO_RESPIRAR',
+    alto: 'D06_ALTO_RELAXAR',
+    neutro: 'D06_NEUTRO'
+  },
+  7: {
+    baixo: 'D07_BAIXO_ROTINA',
+    moderado: 'D07_MODERADO_PLANEJAMENTO',
+    alto: 'D07_ALTO_PRIORIDADE',
+    neutro: 'D07_NEUTRO'
+  }
+};
+
+async function determinarNivel(cfg, participanteId, dia) {
+  // Somente o check-in DESTE DIA define o desafio.
+  // Sem classificação suficiente: desafio neutro.
   const registros = await consultarTabela(
     cfg,
-    "checkins",
+    'checkins',
     {
-      select: "nivel",
+      select: 'nivel',
       participante_id: `eq.${participanteId}`,
-      dia_numero: `lte.${dia}`,
-      order: "dia_numero.desc",
-      limit: 7
+      dia_numero: `eq.${dia}`,
+      limit: 1
     }
   );
 
-  for (const registro of registros) {
-    if (
-      ["baixo", "moderado", "alto"]
-        .includes(registro.nivel)
-    ) {
-      return registro.nivel;
-    }
-  }
+  const nivel = registros[0]?.nivel;
 
-  return null;
+  return ['baixo', 'moderado', 'alto'].includes(nivel)
+    ? nivel
+    : null;
 }
 
 function codigoDoDesafio(dia, nivel) {
-  const numero = String(dia).padStart(2, "0");
+  const codigo = CODIGOS_DESAFIOS[dia]?.[nivel || 'neutro'];
 
-  const sufixo = nivel
-    ? nivel.toUpperCase()
-    : "NEUTRO";
+  if (!codigo) {
+    throw new Error(
+      'Catálogo de desafios inválido para este dia.'
+    );
+  }
 
-  return `D${numero}_${sufixo}`;
+  return codigo;
 }
 
 async function aceitar(cfg, contexto) {

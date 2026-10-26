@@ -1,8 +1,8 @@
 /*
  * FAIR PLAY — SCRIPT DO ESTUDANTE
- * Ambiente: TESTE
+ * Ambiente: TESTE / ORIGINAL (selecionado no servidor)
  * Questionário: 7 dias, 5 perguntas por dia.
- * Catálogo: rascunho 2026.1.
+ * Catálogo de perguntas: rascunho 2026.1; validar antes da coleta.
  *
  * Auth: Supabase.
  * Autorização: Netlify Functions.
@@ -496,6 +496,67 @@ const CH = {
     list: ['read', 'draw', 'family', 'rest']
   }
 };
+
+/*
+ * Catálogo de desafios por dia e nível — PROPOSTA DE CONTEÚDO.
+ * 21 atividades (7 dias × 3 níveis) + 7 opções sem classificação.
+ * Textos novos devem ser validados pelo orientador antes da coleta real.
+ * Não representam diagnóstico ou intervenção de saúde.
+ */
+const DESAFIOS_POR_DIA = [
+  {
+    baixo: { tag: "Dia 1 • Desafio educativo", title: "Rotina em equilíbrio", min: 8, pts: 20, text: "Reserve alguns minutos para escolher quando vai jogar hoje e qual outra atividade também quer fazer. Siga o combinado no seu ritmo.", list: ["family", "read"] },
+    mod: { tag: "Dia 1 • Desafio educativo", title: "Pausa entre as partidas", min: 10, pts: 20, text: "Depois de jogar, faça uma pausa de dez minutos. Você pode conversar, desenhar ou simplesmente descansar antes de continuar.", list: ["draw", "family", "rest"] },
+    alto: { tag: "Dia 1 • Desafio educativo", title: "Um tempo longe dos jogos", min: 20, pts: 20, text: "Escolha uma atividade que goste fora das telas e tente praticá-la por vinte minutos. Se precisar, peça ajuda para organizar esse momento.", list: ["sport", "draw", "family"] },
+    neutro: { tag: "Dia 1 • Desafio educativo", title: "Conheça sua rotina", min: 10, pts: 20, text: "Escolha uma atividade agradável fora das telas e faça uma pequena pausa. Não é necessário receber uma classificação para participar.", list: ["read", "draw", "rest"] }
+  },
+  {
+    baixo: { tag: "Dia 2 • Desafio educativo", title: "Organização primeiro", min: 10, pts: 20, text: "Antes de jogar, confira seus materiais e separe o que precisa fazer para estudar. Um pequeno plano já ajuda bastante.", list: ["study", "read"] },
+    mod: { tag: "Dia 2 • Desafio educativo", title: "Um momento de foco", min: 15, pts: 20, text: "Escolha uma atividade escolar e dedique quinze minutos a ela antes de iniciar outro jogo. Se não houver tarefa, organize o material para o próximo dia.", list: ["study", "read"] },
+    alto: { tag: "Dia 2 • Desafio educativo", title: "Responsabilidades por etapas", min: 20, pts: 20, text: "Divida uma tarefa em partes pequenas. Conclua uma etapa com calma antes de voltar aos jogos. Peça apoio a um adulto se precisar.", list: ["study", "family"] },
+    neutro: { tag: "Dia 2 • Desafio educativo", title: "Prepare o próximo dia", min: 10, pts: 20, text: "Escolha um material ou uma pequena atividade que ajude a preparar sua rotina de amanhã.", list: ["study", "read"] }
+  },
+  {
+    baixo: { tag: "Dia 3 • Desafio educativo", title: "Um horário para descansar", min: 10, pts: 20, text: "Converse com alguém de casa e combine um horário tranquilo para interromper as telas antes do descanso.", list: ["family", "rest"] },
+    mod: { tag: "Dia 3 • Desafio educativo", title: "Pausa de descanso", min: 15, pts: 20, text: "Reserve quinze minutos para descansar longe das telas. Você pode ler, conversar ou ficar em um lugar calmo.", list: ["rest", "read", "family"] },
+    alto: { tag: "Dia 3 • Desafio educativo", title: "Descanso sem telas", min: 20, pts: 20, text: "Experimente ficar vinte minutos sem jogos ou vídeos antes do momento de descanso. Escolha uma atividade calma.", list: ["rest", "read", "family"] },
+    neutro: { tag: "Dia 3 • Desafio educativo", title: "Tempo de descanso", min: 10, pts: 20, text: "Escolha uma atividade tranquila para desacelerar por alguns minutos.", list: ["rest", "read"] }
+  },
+  {
+    baixo: { tag: "Dia 4 • Desafio educativo", title: "Lembrete de pausa", min: 5, pts: 20, text: "Escolha uma pausa de cinco minutos para levantar, beber água ou descansar os olhos enquanto joga.", list: ["rest", "sport"] },
+    mod: { tag: "Dia 4 • Desafio educativo", title: "Pausa com movimento", min: 10, pts: 20, text: "Depois de uma partida, faça dez minutos de movimento leve, se puder, ou uma atividade confortável longe da tela.", list: ["sport", "rest"] },
+    alto: { tag: "Dia 4 • Desafio educativo", title: "Outra atividade no intervalo", min: 20, pts: 20, text: "Reserve vinte minutos para uma atividade fora dos jogos. Pode ser desenho, leitura, conversa ou um movimento de que goste.", list: ["draw", "read", "family", "sport"] },
+    neutro: { tag: "Dia 4 • Desafio educativo", title: "Sua pausa preferida", min: 5, pts: 20, text: "Escolha um tipo de pausa e experimente fazê-la durante alguns minutos.", list: ["rest", "read"] }
+  },
+  {
+    baixo: { tag: "Dia 5 • Desafio educativo", title: "Lazer além das telas", min: 10, pts: 20, text: "Escolha uma brincadeira ou atividade de que gosta fora das telas e aproveite por dez minutos.", list: ["draw", "sport", "family"] },
+    mod: { tag: "Dia 5 • Desafio educativo", title: "Experimente outra atividade", min: 15, pts: 20, text: "Reserve quinze minutos para desenhar, ler, caminhar acompanhado ou conversar com alguém, conforme sua preferência.", list: ["draw", "read", "family", "sport"] },
+    alto: { tag: "Dia 5 • Desafio educativo", title: "Descubra outro passatempo", min: 20, pts: 20, text: "Passe vinte minutos com uma atividade sem jogos eletrônicos. O objetivo é experimentar outras formas de diversão.", list: ["draw", "read", "family", "sport"] },
+    neutro: { tag: "Dia 5 • Desafio educativo", title: "Um passatempo diferente", min: 10, pts: 20, text: "Experimente uma brincadeira ou um passatempo fora das telas, do seu jeito.", list: ["draw", "family"] }
+  },
+  {
+    baixo: { tag: "Dia 6 • Desafio educativo", title: "Perceba como você está", min: 5, pts: 20, text: "Depois de jogar, pare um instante e pense em como se sentiu. Se quiser, compartilhe com alguém de confiança.", list: ["family", "rest"] },
+    mod: { tag: "Dia 6 • Desafio educativo", title: "Pausa para respirar", min: 5, pts: 20, text: "Faça uma pausa tranquila de cinco minutos antes de iniciar outra partida. Respire normalmente e volte quando quiser.", list: ["rest", "family"] },
+    alto: { tag: "Dia 6 • Desafio educativo", title: "Uma atividade tranquila", min: 15, pts: 20, text: "Se uma partida deixou você chateado, troque de atividade por quinze minutos. Conversar com alguém também pode ajudar.", list: ["rest", "draw", "family"] },
+    neutro: { tag: "Dia 6 • Desafio educativo", title: "Pausa de tranquilidade", min: 10, pts: 20, text: "Escolha uma atividade relaxante por alguns minutos, sem precisar avaliar suas emoções.", list: ["rest", "draw"] }
+  },
+  {
+    baixo: { tag: "Dia 7 • Desafio educativo", title: "Mantenha sua boa rotina", min: 10, pts: 20, text: "Lembre de uma coisa que ajudou a equilibrar jogos, estudos e descanso. Planeje como repetir esse hábito.", list: ["study", "family", "rest"] },
+    mod: { tag: "Dia 7 • Desafio educativo", title: "Planeje a próxima semana", min: 15, pts: 20, text: "Escolha horários simples para jogar, estudar e descansar. Anote ou combine esse plano com alguém de casa.", list: ["study", "family", "rest"] },
+    alto: { tag: "Dia 7 • Desafio educativo", title: "Escolha uma prioridade", min: 20, pts: 20, text: "Antes de jogar, escolha uma tarefa ou atividade importante para fazer primeiro. Depois, organize seu tempo livre.", list: ["study", "family", "rest"] },
+    neutro: { tag: "Dia 7 • Desafio educativo", title: "Seu pequeno plano", min: 10, pts: 20, text: "Escolha uma atividade que deseja repetir na próxima semana para cuidar da sua rotina.", list: ["study", "family", "rest"] }
+  }
+];
+
+function desafioParaDia(dia, nivel) {
+  const indice = Number(dia) - 1;
+  if (!Number.isInteger(indice) || indice < 0 || indice >= 7) {
+    return CH[nivel] || CH.neutro;
+  }
+  return DESAFIOS_POR_DIA[indice][nivel] ||
+    DESAFIOS_POR_DIA[indice].neutro;
+}
+
 const C = 2 * Math.PI * 54;
 const $ = id => document.getElementById(id);
 const $$ = seletor => [...document.querySelectorAll(seletor)];
@@ -1905,7 +1966,7 @@ function normalizarDesafioRemoto(registro, anterior = null) {
     : ['baixo', 'alto'].includes(registro.nivel_atribuido)
       ? registro.nivel_atribuido
       : 'neutro';
-  const tempoInicial = CH[nivel].min * 60;
+  const tempoInicial = desafioParaDia(registro.dia_numero, nivel).min * 60;
   const mesmoCodigo = anterior?.codigo === registro.codigo_desafio;
   const aceito = registro.status === 'aceito';
   return {
@@ -2015,26 +2076,13 @@ function nivelHoje() {
   return checkinDoDia(dia)?.nivel || null;
 }
 function nivelDesafioNovo() {
-  const hoje = nivelHoje();
-  if (hoje) return hoje;
-  const dia = diaDoTeste();
-  const limite = dia === null
-    ? DIAS_DO_TESTE
-    : Math.min(
-        Math.max(dia, 0),
-        DIAS_DO_TESTE
-      );
-  for (let n = limite; n >= 1; n--) {
-    const checkin = checkinDoDia(n);
-    if (checkin) {
-      return checkin.nivel || 'neutro';
-    }
-  }
-  return 'neutro';
+  // O nível de um dia anterior não deve substituir
+  // a ausência de classificação do dia atual.
+  return nivelHoje() || 'neutro';
 }
 function restanteDoDesafio(desafio) {
   const total =
-    CH[desafio.nivel].min * 60;
+    desafioParaDia(S.ativo?.dia, desafio.nivel).min * 60;
   const restante = desafio.prazo
     ? Math.ceil(
         (desafio.prazo - Date.now()) / 1000
@@ -2058,7 +2106,7 @@ function draw() {
   const desafio = desafioAtivo();
   if (!desafio) return;
   const total =
-    CH[desafio.nivel].min * 60;
+    desafioParaDia(S.ativo?.dia, desafio.nivel).min * 60;
   const restante =
     restanteDoDesafio(desafio);
   $('clock').textContent =
@@ -2236,7 +2284,7 @@ function renderChallenge() {
     ? desafiosDoDia(dia).find(d => d.origem === 'supabase') || null
     : null;
   const nivel = desafio?.nivel || existente?.nivel || nivelDesafioNovo();
-  const config = CH[nivel] || CH.neutro;
+  const config = desafioParaDia(dia, nivel);
 
   $('chTag').textContent = config.tag;
   $('chTitle').textContent = config.title;
