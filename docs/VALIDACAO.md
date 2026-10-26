@@ -41,7 +41,7 @@ Todas têm entradas `/api/<nome>` e compatibilidade `/.netlify/functions/<nome>`
 
 ## Evidências e limites
 
-`npm run check` passou com **116 testes, zero falhas e zero ignorados**, após reinstalação com `npm ci`. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
+`npm run check` passou com **119 testes, zero falhas e zero ignorados**, na última execução. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
 
 Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegador gráfico: layout responsivo, renderização de fontes/CDNs e teste em celular ainda exigem aceitação no ambiente TESTE publicado. O esquema SQL externo não foi inspecionado, pois não há acesso administrativo nesta sessão. As verificações reais públicas e com identidade anônima estão registradas na entrega candidata. Nenhuma conexão, execução SQL ou publicação ORIGINAL faz parte da validação realizada.
 
@@ -56,3 +56,5 @@ Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegado
 O projeto também inclui tarefas VS Code (preparação, testes, F5 e conferência do deploy), criação idempotente de `.env.local`, validação de configuração TESTE e conferência HTTP sem credenciais. O relatório SQL de esquema é somente leitura. Esses recursos não executam migração remota ou deploy automaticamente.
 
 A revisão incremental da 002 e a preparação da referência ORIGINAL estão detalhadas em [Entrega candidata](ENTREGA_CANDIDATA.md). A nova suíte reproduz as características de esquema informadas pelo responsável, sem afirmar inspeção ou alteração de bancos externos.
+
+A aceitação no sistema publicado está separada em [Aceitação publicada](ACEITACAO_PUBLICADA.md): nove cenários reais de Chromium passaram. Os três novos testes locais verificam a correção pontual de ACL de `rls_auto_enable()` e a continuidade de seu event trigger. A 002 já aplicada não foi reaplicada nesta etapa.

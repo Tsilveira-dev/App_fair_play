@@ -2,7 +2,7 @@
 
 TESTE: `jzxltkjxdefuptutpkfx`. ORIGINAL: `swbwbkslcotoecjlbqxe`.
 
-O responsável informou que o TESTE já tem tabelas, RLS, registros fictícios e UNIQUEs, incluindo `sessoes_uma_ativa_por_participante` para **pendente e aprovada**. A RPC e os triggers da 002 ainda não existem. Essas características foram reproduzidas em PostgreSQL PGlite local; o esquema hospedado não pôde ser inspecionado nesta sessão, que não dispõe de acesso administrativo ao Supabase.
+O responsável informou que o TESTE já tem tabelas, RLS, registros fictícios e UNIQUEs, incluindo `sessoes_uma_ativa_por_participante` para **pendente e aprovada**. A atualização recebida confirma que a 002 já foi aplicada com sucesso, incluindo RPC, três triggers e visão, preservando os registros. Não reaplicar 002 no TESTE e não recriar o projeto. Essas características foram reproduzidas em PostgreSQL PGlite local; o esquema hospedado não pôde ser inspecionado nesta sessão, que não dispõe de acesso administrativo ao Supabase.
 
 **Não executar `001_schema.sql` no TESTE existente.** A baseline é exclusiva de banco vazio e não deve ser reaplicada depois da proteção 002, pois contém grants iniciais mais amplos.
 
@@ -13,9 +13,9 @@ O responsável informou que o TESTE já tem tabelas, RLS, registros fictícios e
 | `migrations/002_protecao.sql` | Instalação incremental, atômica e repetível das proteções em esquema compatível. |
 | `reverter_002.sql` | Reversão seletiva da nova 002, mantendo todas as linhas e tabelas de pesquisa. |
 
-## Aplicar somente ao TESTE após verificar o esquema
+## Referência de instalação — não executar novamente no TESTE já protegido
 
-1. Confirme no painel/API a referência `jzxltkjxdefuptutpkfx`. Preserve um backup administrativo e execute o relatório de metadados. Compare colunas, defaults, tipos, UNIQUEs, índices parciais, policies, grants de tabela/coluna e triggers. O token da Management API, se utilizado, deve ser fornecido nas configurações seguras, nunca no chat ou no Git.
+1. Confirme no painel/API a referência `jzxltkjxdefuptutpkfx`. Preserve um backup administrativo e execute o relatório de metadados. Compare colunas, defaults, tipos, UNIQUEs, índices parciais, policies, grants de tabela/coluna e triggers. Use a integração administrativa já autorizada para a leitura; não renovar ou solicitar credenciais por esse procedimento.
 2. A 002 verifica as colunas necessárias e recusa objetos de proteção preexistentes sem o backup da migração. Caso uma versão antiga da 002 já tenha sido instalada, pare para revisão: não apague funções ou triggers para contornar essa verificação.
 3. Execute o arquivo completo em uma janela de manutenção. A transação tem limite de espera por locks e usa bloqueio para evitar aplicação/reversão simultânea. Se qualquer verificação falhar, reverta a transação; não remova registros para fazê-la passar.
 4. A migração reconhece UNIQUEs equivalentes mesmo com outros nomes ou ordem de colunas. Preserva o índice que cobre pendentes e aprovadas. Se uma unicidade necessária estiver ausente, cria apenas o índice faltante e registra seu nome para reversão; duplicidades causam rollback, sem correção automática dos dados. Predicados desconhecidos no índice esperado exigem revisão.
@@ -38,3 +38,7 @@ A reversão também restaura as permissões antigas, que podem ser mais amplas; 
 ## ORIGINAL
 
 Não foi consultado nem modificado nesta sessão. Compare seu esquema real antes de escolher entre baseline e migração incremental. Não copie participantes, contas Auth, sessões, respostas, desafios, tentativas ou backups do TESTE. A execução no ORIGINAL, a integração à `main` e sua publicação continuam dependendo da validação final do responsável.
+
+## ACL da função legada `rls_auto_enable()`
+
+A inspeção somente de metadados está em `inspecionar_rls_auto_enable.sql`; a correção mínima está em `restringir_rls_auto_enable.sql`. Ela revoga apenas EXECUTE de PUBLIC/anon/authenticated e confere que definição e event triggers permanecem intactos. Não instala outra função ou reaplica 002. Uma assinatura diferente de `event_trigger` ou herança por outros papéis interrompe a transação. A correção ainda não foi aplicada ao banco hospedado por esta sessão; veja [a aceitação publicada](../docs/ACEITACAO_PUBLICADA.md).

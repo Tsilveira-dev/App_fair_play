@@ -28,7 +28,7 @@ npm run verificar:deploy -- https://SEU-PROJETO-DE-TESTE.vercel.app
 Use um projeto separado, como `fairplay-teste`. O projeto ORIGINAL não deve receber essas credenciais nem esta implantação.
 
 1. Vincule `Tsilveira-dev/App_fair_play` e selecione **teste-supabase** para a implantação. Confira em **Settings → Git** que a Production Branch desse projeto de TESTE é `teste-supabase`. Não integre o PR à `main` para conseguir fazer isso.
-2. Se a importação oferecer somente `main`, não dispare essa implantação. Uma alternativa é criar/vincular o projeto sem deploy pelo terminal do VS Code com `npx vercel@65.2.0 link`, escolher/criar `fairplay-teste` e usar a raiz `.`. Esse comando requer sua autenticação na Vercel; não executa deploy. Depois configure a integração Git e a branch no painel antes da implantação de TESTE.
+2. O projeto `fairplay-teste` já existe e está publicado; não recrie, não execute nova importação ou vinculação. Preserve a branch `teste-supabase`.
 3. Em **Settings → Build and Deployment** (ou os campos equivalentes de configuração da implantação), use:
 
 | Campo | Valor |
@@ -61,7 +61,7 @@ Essas etapas dependem do projeto hospedado e não são concluídas apenas com os
 
 - Habilitar autenticação anônima dos estudantes e login de gestor por e-mail/senha.
 - Conferir o esquema existente. O arquivo [inspecionar_esquema.sql](../supabase/inspecionar_esquema.sql) é somente leitura e não consulta dados pessoais ou respostas. Abra-o no VS Code e execute-o no SQL Editor **do TESTE** para fazer a comparação.
-- Revisar/aplicar a migração `002_protecao.sql` somente em um esquema compatível; a RPC `registrar_tentativa_acesso` é necessária para novas solicitações. Não aplicar `001_schema.sql` sobre um banco existente sem o procedimento de revisão.
+- A 002 já está aplicada ao TESTE, com RPC e proteções confirmadas. Não reaplicar 002 ou 001; os próximos passos são a aceitação positiva e a auditoria pontual de ACL, usando os acessos já autorizados.
 - Cadastrar administrativamente o UID do gestor real de TESTE em `gestores` e definir a data oficial em `configuracao_teste`, conforme [as instruções SQL](../supabase/README.md). A aplicação não inventa uma data ou uma identidade de gestor.
 - Atualizar Site URL e URLs de redirecionamento do Auth para o domínio de TESTE autorizado após a Vercel gerar o endereço.
 

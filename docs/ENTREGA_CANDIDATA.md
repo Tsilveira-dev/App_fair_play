@@ -4,25 +4,23 @@ Código na branch `teste-supabase`; PR #1 permanece em rascunho. Não representa
 
 ## Evidências desta etapa
 
-- `npm run check`: **116 testes aprovados, zero falhas, zero ignorados**, com validação de build/sintaxe.
+- `npm run check`: **119 testes aprovados, zero falhas, zero ignorados**, com validação de build/sintaxe.
 - A migração 002 foi testada em PostgreSQL PGlite com dados fictícios históricos, grants por coluna, UNIQUEs com nomes diferentes e índice de sessões pendentes/aprovadas. Não houve cópia do banco externo.
 - Verificados: preservação integral das linhas, ausência de índices redundantes, reaplicação, permissões mínimas, RPC pela `service_role` sem default de UUID, triggers, aprovação, pontos 10+20, Dia 8 e reversão/reaplicação sem apagar registros. Índice incompatível e alterações administrativas posteriores abortam com rollback.
 - As suítes existentes continuam verificando autenticação, autorização, respostas, classificação, desafios, cronômetro opcional, restauração de dados na interface e identidade dos textos do catálogo recebido.
 - Verificação real em `https://fairplay-teste.vercel.app`: páginas e `/api/config-public` retornaram 200; ambiente e URL TESTE confirmados; `/api/checkin` sem token retornou 401. O bloqueio de rede inicial foi resolvido após atualizar os destinos necessários no rascunho da configuração.
 
-- Supabase Auth TESTE confirmou e-mail e usuários anônimos habilitados. Foi criada **uma identidade anônima fictícia**, marcada com `user_metadata.fairplay_validacao_autonoma=true`, exclusivamente para verificar controles. Tokens ficaram somente em memória e não foram gravados ou publicados.
+- Supabase Auth TESTE confirmou e-mail e usuários anônimos habilitados. Na etapa anterior foi criada **uma identidade anônima fictícia**, marcada com `user_metadata.fairplay_validacao_autonoma=true`, exclusivamente para verificar controles. Tokens ficaram somente em memória e não foram gravados ou publicados.
 - Com essa sessão não vinculada: `consultar-acesso` retornou 200, `status=sem_solicitacao`, `pode_entrar=false` e `coleta_liberada=false`; check-ins, desafios e verificação de gestor retornaram 403; listagem de participantes retornou 401. Não foi cadastrado participante nem gravado check-in/desafio por essa verificação.
 - A consulta somente de metadados REST com a chave pública retornou 401. Essa chave não fornece a inspeção administrativa necessária para comparar/aplicar a migração; não foi contornada a restrição.
 
-## Estado e limites
+## Estado atual de aceitação
 
-| Frente | Resultado |
-| --- | --- |
-| Arquivos e SQL incremental | Preparados e validados localmente |
-| Banco TESTE hospedado | Criada somente a identidade Auth fictícia de verificação; nenhuma migração SQL aplicada; sem token/conexão administrativa |
-| Fluxo completo na Vercel com gestor real de TESTE | Não executado por completo: controles públicos e de sessão anônima verificados; operações de gestor/gravação dependem da migração e do acesso administrativo/de gestor |
-| Banco ORIGINAL | Não consultado nem alterado; comparação externa ainda pendente |
-| Integração à main e publicação ORIGINAL | Não executadas |
+O responsável confirmou a 002 **já aplicada** no TESTE, com RPC, três triggers, visão, registros preservados, um gestor e uma sessão aprovada ativa. Não reaplicar a migração, não recriar o projeto e não solicitar credenciais novamente.
+
+A etapa seguinte executou nove cenários reais em Chromium no aplicativo publicado: formulário, catálogo 7×5, solicitação fictícia 202, limite de reenvio 429, bloqueios de autorização e restauração da mesma sessão após recarga. O login válido de gestor e o fluxo positivo com gravação/pontuação continuam não executados nesta ferramenta. A correção de ACL de `rls_auto_enable()` foi preparada, sem aplicação hospedada. Evidências e limites completos em [Aceitação publicada](ACEITACAO_PUBLICADA.md).
+
+A comparação administrativa dos metadados ORIGINAL não foi executada nesta sessão. A main e o ORIGINAL permanecem sem alterações.
 
 ## Preparação do ORIGINAL
 
@@ -38,8 +36,8 @@ O aplicativo utiliza UID Auth, primeiro nome, respostas, classificação, horár
 
 Ainda não foi definido um prazo institucional de retenção, um procedimento de acesso/exportação ou o protocolo de encerramento da pesquisa. Não foi criada rotina de expurgo, exclusão, exportação de dados pessoais ou transferência entre bancos. A identidade fictícia criada não foi excluída, respeitando a proibição de exclusões. O responsável precisa confirmar essas decisões e o procedimento de consentimento aplicável antes da coleta.
 
-## Operações externas ainda necessárias
+## Pendências finais
 
-1. Disponibilizar acesso administrativo seguro ao Supabase de TESTE nesta sessão, ou executar a revisão/aplicação da 002 pelo procedimento documentado, sem fornecer segredos no chat. A exigência `SUPABASE_ACCESS_TOKEN` foi registrada nas configurações seguras para a Management API; não há valor vinculado.
-2. Aplicar a 002 somente após conferir o esquema e a referência TESTE; validar login do gestor, cadastro fictício, solicitação/aprovação, check-in, desafio, 30 pontos e restauração após recarga no domínio Vercel TESTE.
-3. Obter metadados do ORIGINAL, confirmar datas, textos, acesso e retenção com a equipe e decidir sobre integração/publicação ORIGINAL. Nenhuma dessas decisões autoriza transportar dados fictícios.
+1. Concluir o fluxo positivo usando a sessão de gestor e o estudante fictício já aprovados: cadastro/solicitação/aprovação, cinco respostas, check-in, desafio, pontuação e recarga.
+2. Pela integração administrativa já autorizada, conferir metadados/ACL de `rls_auto_enable()` e avaliar a correção pontual, sem reaplicar 002; comparar exclusivamente metadados do ORIGINAL.
+3. Validar textos, datas, consentimento, retenção e a aceitação final antes de decidir sobre main e publicação ORIGINAL. Não transferir dados do TESTE.
