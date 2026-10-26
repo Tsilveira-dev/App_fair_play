@@ -41,16 +41,16 @@ Todas têm entradas `/api/<nome>` e compatibilidade `/.netlify/functions/<nome>`
 
 ## Evidências e limites
 
-`npm run check` passou com **119 testes, zero falhas e zero ignorados**, na última execução. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
+`npm run check` passou com **125 testes, zero falhas e zero ignorados**, na última execução. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
 
-Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegador gráfico. A revisão de mensagens acrescenta inspeção em Chromium nas larguras 320, 375, 390, 768 e 1280 px com estados fictícios em memória, sem gravações; não equivale a teste em aparelho físico ou aceitação autenticada. A pendência de layout e o resultado funcional de `Experimento` informado pelo responsável estão em [Aceitação publicada](ACEITACAO_PUBLICADA.md). O esquema SQL externo não foi inspecionado, pois não há acesso administrativo nesta sessão. As verificações reais públicas e com identidade anônima estão registradas na entrega candidata. Nenhuma conexão, execução SQL ou publicação ORIGINAL faz parte da validação realizada.
+Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegador gráfico. A revisão de mensagens acrescenta inspeção em Chromium nas larguras 320, 375, 390, 768 e 1280 px com estados fictícios em memória, sem gravações; não equivale a teste em aparelho físico ou aceitação autenticada. A correção responsiva (150 casos de apresentação, 28 títulos em cinco larguras) e o resultado funcional de `Experimento` informado pelo responsável estão em [Aceitação publicada](ACEITACAO_PUBLICADA.md). A integração administrativa confirmou a inspeção somente de metadados do ORIGINAL; o Codex recebeu o resumo, sem consultar o banco. Ver [Estado dos bancos](ESTADO_BANCOS.md). As verificações reais públicas e com identidade anônima estão registradas na entrega candidata. Nenhuma conexão, execução SQL ou publicação ORIGINAL faz parte da validação realizada.
 
 ## Pendências de implantação
 
 1. O Vercel TESTE já está conectado e configurado; a 002 já foi aplicada pela integração administrativa. Não reaplicar 001/002, recriar projetos ou solicitar novamente credenciais.
 2. Completar somente as evidências de aceitação ainda ausentes (gestor, aprovação e recarga de registros), sem repetir o fluxo de `Experimento` já confirmado pelo responsável.
-3. Revisar o layout do título aprovado de desafio em telas estreitas; os novos textos da interface foram conferidos com emulação de largura.
-4. Conferir ACL/metadados pela integração administrativa já autorizada e validar catálogo, datas, consentimento e retenção com o responsável antes da coleta.
+3. A correção do cartão foi conferida em celular e desktop com Chromium; concluir a aceitação da equipe em dispositivo físico conforme disponibilidade.
+4. Revisar o [plano ORIGINAL](ORIGINAL.md) com os metadados já confirmados e validar catálogo, datas, consentimento e retenção. Restrição de EXECUTE e migração 002 do TESTE já concluídas.
 5. Aprovar separadamente PR/integração à `main`, eventuais ajustes no ORIGINAL e publicação ORIGINAL. Não transportar dados do TESTE.
 
 O projeto também inclui tarefas VS Code (preparação, testes, F5 e conferência do deploy), criação idempotente de `.env.local`, validação de configuração TESTE e conferência HTTP sem credenciais. O relatório SQL de esquema é somente leitura. Esses recursos não executam migração remota ou deploy automaticamente.
@@ -58,3 +58,5 @@ O projeto também inclui tarefas VS Code (preparação, testes, F5 e conferênci
 A revisão incremental da 002 e a preparação da referência ORIGINAL estão detalhadas em [Entrega candidata](ENTREGA_CANDIDATA.md). A nova suíte reproduz as características de esquema informadas pelo responsável, sem afirmar inspeção ou alteração de bancos externos.
 
 A aceitação no sistema publicado está separada em [Aceitação publicada](ACEITACAO_PUBLICADA.md): nove cenários reais de Chromium passaram. Os três novos testes locais verificam a correção pontual de ACL de `rls_auto_enable()` e a continuidade de seu event trigger. A 002 já aplicada não foi reaplicada nesta etapa.
+
+Seis novos testes locais em `tests/sql-original.test.mjs` exercitam a sequência incremental ORIGINAL preparada: tabela de tentativas ausente, índice pendente/aprovada, event trigger, grants e visão, permissões herdadas, divergências/rollback e defaults amplos de CREATE VIEW. São testes em PGlite, não execução no ORIGINAL.

@@ -2,7 +2,7 @@
 
 Para executar a preparação no editor e configurar o painel, siga [VS Code e Vercel](VS_CODE_VERCEL.md).
 
-O projeto Vercel de TESTE `fairplay-teste` já está conectado e tem deploy bem-sucedido registrado no GitHub. Nesta etapa houve apenas a criação de uma identidade Auth fictícia no TESTE e verificações de acesso, sem migração SQL externa; veja o [estado da candidata](ENTREGA_CANDIDATA.md). A integração Netlify preexistente cria previews automaticamente ao abrir/atualizar o PR, inclusive no projeto fairplay-app; a trava CONTEXT/HEAD bloqueia ORIGINAL nesses previews. A produção em main não foi alterada.
+O projeto Vercel de TESTE `fairplay-teste` já está conectado e tem deploy bem-sucedido registrado no GitHub. O [estado dos bancos](ESTADO_BANCOS.md) separa a validação do Codex das confirmações administrativas: 002 e restrição de EXECUTE já aplicadas no TESTE, fluxo de Experimento validado e metadados ORIGINAL já inspecionados somente em leitura. Não repetir essas etapas. A integração Netlify preexistente cria previews automaticamente ao abrir/atualizar o PR, inclusive no projeto fairplay-app; a trava CONTEXT/HEAD bloqueia ORIGINAL nesses previews. A produção em main não foi alterada.
 
 ## TESTE primeiro
 
@@ -29,13 +29,9 @@ O frontend usa jsDelivr para Supabase JS 2.45.4, Tailwind CDN e Google Fonts, pr
 
 ## ORIGINAL — executar somente com aprovação explícita
 
-- Revisar o PR e autorizar a integração à `main`; não promover automaticamente as credenciais do TESTE.
-- Confirmar a validação acadêmica dos textos: o código recebido ainda identifica questionário e desafios como rascunho/proposta. Eles foram preservados integralmente.
-- Fazer backup do ORIGINAL e comparar o esquema existente com a baseline. Aprovar separadamente a execução das migrações; nunca importar registros, usuários, sessões ou respostas fictícias do TESTE.
-- Criar/configurar outro projeto Vercel, com Production Branch `main`, credenciais exclusivas e `AMBIENTE=original`. Definir `SUPABASE_URL` e `SUPABASE_ORIGINAL_URL_ESPERADA` com a mesma URL ORIGINAL `https://swbwbkslcotoecjlbqxe.supabase.co`, diferente do TESTE. Não atribuir valores ORIGINAL a Preview ou Development.
-- O servidor rejeita ORIGINAL em previews e em branches diferentes de `main`. Essas verificações complementam a separação de projetos e credenciais; não substituem a revisão das configurações de implantação.
-- Recriar o gestor real no Auth ORIGINAL e cadastrar seu UID administrativamente. Cadastrar participantes reais somente pelo procedimento autorizado da pesquisa. Não copiar contas, senhas ou sessões do TESTE.
-- Autorizar o deploy ORIGINAL e executar os testes de aceitação com a equipe antes de liberar aos estudantes. Revisar prazos de coleta, acesso, consentimento e guarda dos dados conforme o protocolo da pesquisa.
+O roteiro completo e o checklist mínimo estão em [Plano ORIGINAL](ORIGINAL.md), incluindo tabela de tentativas antes da 002, grants, índices, event triggers e configuração Vercel `main`/Production com banco ORIGINAL. O ORIGINAL existente tem oito tabelas e RLS ativo conforme inspeção administrativa; não executar a baseline 001.
+
+A preparação não executa SQL, integra o PR ou publica. Autorizar essas ações separadamente após a aceitação do TESTE. Não copiar dados/contas fictícias nem credenciais entre ambientes.
 
 ## Operação e reversão
 

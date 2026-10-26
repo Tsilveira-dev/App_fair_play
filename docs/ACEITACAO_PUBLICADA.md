@@ -42,13 +42,13 @@ A integração administrativa utilizada no outro ChatGPT não está disponível 
 
 ## `rls_auto_enable()` e comparação do ORIGINAL
 
-A exposição de EXECUTE a `anon`/`authenticated` foi informada pelo responsável. Não houve leitura administrativa do ACL ou da definição hospedada nesta execução. O relatório `supabase/inspecionar_rls_auto_enable.sql` consulta exclusivamente assinatura, hash, proprietário, grants efetivos e event triggers associados, sem invocar a função.
+A exposição de EXECUTE a `anon`/`authenticated` foi informada anteriormente pelo responsável. A atualização administrativa agora confirma a restrição aplicada e validada no TESTE. O Codex não executou essa aplicação nem a repetiu. O relatório `supabase/inspecionar_rls_auto_enable.sql` consulta exclusivamente assinatura, hash, proprietário, grants efetivos e event triggers associados, sem invocar a função.
 
 A correção pontual `supabase/restringir_rls_auto_enable.sql` revoga somente EXECUTE de `PUBLIC`, `anon` e `authenticated`. Revogar PUBLIC é necessário porque seus privilégios também são herdados pelos dois papéis. Não reescreve o corpo, muda proprietário/search_path, recria ou desativa event triggers, reaplica 002 ou altera dados de pesquisa. Confere o retorno `event_trigger` e preserva os hashes/associações. Assinatura inesperada ou permissão ainda herdada de outro papel causa rollback, exigindo revisão em vez de ampliar a mudança.
 
-A correção foi preparada e validada localmente; **não foi aplicada ao TESTE hospedado nem ao ORIGINAL**. O teste PostgreSQL confirmou que CREATE TABLE por uma role sem EXECUTE continuou acionando o event trigger e habilitando RLS.
+A correção foi preparada e validada localmente pelo Codex e **já foi aplicada e validada no TESTE pela integração administrativa do ChatGPT**, conforme informado pelo responsável. Não é pendência do TESTE. Não há confirmação de aplicação no ORIGINAL. O teste PostgreSQL confirmou que CREATE TABLE por uma role sem EXECUTE continuou acionando o event trigger e habilitando RLS.
 
-A consulta `supabase/inspecionar_esquema.sql` foi ampliada para comparar apenas metadados: colunas, constraints, índices, RLS, grants, policies, assinaturas/hashes e opções da visão. O banco ORIGINAL `swbwbkslcotoecjlbqxe` não foi consultado ou modificado. Sua comparação efetiva ainda depende da integração administrativa já autorizada, sem solicitar novas credenciais.
+A consulta `supabase/inspecionar_esquema.sql` foi ampliada para comparar apenas metadados: colunas, constraints, índices, RLS, grants, policies, assinaturas/hashes e opções da visão. A integração administrativa já inspecionou os metadados do ORIGINAL `swbwbkslcotoecjlbqxe`, somente em leitura: oito tabelas iniciais, RLS ativo e UNIQUE pendente/aprovada; faltam tabela de tentativas, RPC e visão. O Codex recebeu esse resumo sem executar consultas próprias no ORIGINAL. Ver [estado dos bancos](ESTADO_BANCOS.md) e [plano incremental](ORIGINAL.md).
 
 ## Atualização de 26/10/2026 — mensagens e Progresso
 
@@ -62,6 +62,17 @@ A inspeção gráfica usa Chromium com estados fictícios apenas em memória, **
 
 O rótulo do cronômetro foi encurtado para **INICIAR**, preservando sua natureza opcional, para que os controles não ultrapassem a tela. Rótulos de estatísticas foram abreviados para **desafios feitos** e **dias em série**, evitando palavras maiores que os cartões em 768 px. Os novos avisos permanecem legíveis e sem cortes nas larguras verificadas.
 
-**Pendência de layout identificada:** o título aprovado “Responsabilidades por etapas” excede a área interna do cartão em 320/375 px e causa rolagem horizontal em 320 px. O texto do desafio e o CSS foram preservados conforme a restrição desta tarefa a mensagens da interface; o ajuste responsivo continua pendente. A inspeção não autoriza concluir que todos os títulos do catálogo cabem em qualquer dispositivo.
+**Histórico da revisão de mensagens — resolvido na etapa seguinte:** o título aprovado “Responsabilidades por etapas” excede a área interna do cartão em 320/375 px e causa rolagem horizontal em 320 px. O texto do desafio e o CSS foram preservados conforme a restrição desta tarefa a mensagens da interface; o ajuste responsivo foi autorizado e executado na etapa seguinte, descrita abaixo.
 
 A validação local continua com `npm run check` (119 testes). A publicação desta revisão se restringe ao projeto Vercel TESTE; `main`, banco ORIGINAL, migrações e registros permanecem intactos. Não foram criadas novas identidades fictícias nesta revisão.
+
+
+## Responsividade e preparação ORIGINAL — 26/10/2026
+
+O Codex ajustou exclusivamente a apresentação do cartão: fonte de 22 px no título em celular, mantendo 30 px a partir de 640 px, quebra de palavras como salvaguarda e botões do cronômetro com quebra de linha dentro do cartão. Os textos e a lógica do JavaScript permanecem intactos.
+
+**Inspeção gráfica desta etapa:** Chromium com fontes/CDNs reais, em 320, 375, 390, 768 e 1280 px. Foram verificados os 28 títulos do catálogo por largura (140 casos), mais os estados aceito/concluído de “Responsabilidades por etapas” em cada largura (10 casos): **150 casos sem corte de título, rolagem horizontal ou conteúdo fora da área interna do cartão**. Capturas de celular e desktop foram inspecionadas visualmente. Estados fictícios apenas em memória, sem sessão, criação de conta ou escrita no banco; não é repetição do teste funcional de `Experimento` nem teste em aparelho físico.
+
+**Automação:** `npm run check` passa a abranger 125 testes, incluindo seis novos testes PostgreSQL do plano ORIGINAL. Eles modelam as características administrativas informadas, sem copiar dados externos: pré-requisito vazio, preservação de registros/índice/event trigger, grants mínimos, RPC, verificação somente leitura, rollback em incompatibilidades e defaults amplos da visão. Não houve execução SQL hospedada.
+
+O [estado confirmado dos bancos](ESTADO_BANCOS.md) distingue observações do Codex das confirmações administrativas. O [plano ORIGINAL](ORIGINAL.md) inclui a tabela ausente antes da 002, revisão de grants/índices/event triggers e configuração Vercel `main` com credenciais exclusivas de Production. Está preparado para revisão, **não executado**. O PR #1 continua em rascunho; `main` e ORIGINAL não foram alterados.

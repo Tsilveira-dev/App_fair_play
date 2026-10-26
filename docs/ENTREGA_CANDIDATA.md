@@ -4,7 +4,7 @@ Código na branch `teste-supabase`; PR #1 permanece em rascunho. Não representa
 
 ## Evidências desta etapa
 
-- `npm run check`: **119 testes aprovados, zero falhas, zero ignorados**, com validação de build/sintaxe.
+- `npm run check`: **125 testes aprovados, zero falhas, zero ignorados**, com validação de build/sintaxe.
 - A migração 002 foi testada em PostgreSQL PGlite com dados fictícios históricos, grants por coluna, UNIQUEs com nomes diferentes e índice de sessões pendentes/aprovadas. Não houve cópia do banco externo.
 - Verificados: preservação integral das linhas, ausência de índices redundantes, reaplicação, permissões mínimas, RPC pela `service_role` sem default de UUID, triggers, aprovação, pontos 10+20, Dia 8 e reversão/reaplicação sem apagar registros. Índice incompatível e alterações administrativas posteriores abortam com rollback.
 - As suítes existentes continuam verificando autenticação, autorização, respostas, classificação, desafios, cronômetro opcional, restauração de dados na interface e identidade dos textos do catálogo recebido.
@@ -18,15 +18,15 @@ Código na branch `teste-supabase`; PR #1 permanece em rascunho. Não representa
 
 O responsável confirmou a 002 **já aplicada** no TESTE, com RPC, três triggers, visão, registros preservados, um gestor e uma sessão aprovada ativa. Não reaplicar a migração, não recriar o projeto e não solicitar credenciais novamente.
 
-A etapa seguinte executou nove cenários reais em Chromium no aplicativo publicado: formulário, catálogo 7×5, solicitação fictícia 202, limite de reenvio 429, bloqueios de autorização e restauração da mesma sessão após recarga. O login válido de gestor continua não executado nesta ferramenta. Posteriormente, o responsável confirmou a aceitação positiva de `Experimento`: cinco respostas no Dia 2, 8/10, nível alto, `D02_ALTO_ETAPAS` concluído e 30 pontos na visão do TESTE. A evidência foi recebida do ChatGPT administrativo e não repetida nesta sessão. A correção de ACL de `rls_auto_enable()` foi preparada, sem aplicação hospedada. Evidências e limites completos em [Aceitação publicada](ACEITACAO_PUBLICADA.md).
+A etapa seguinte executou nove cenários reais em Chromium no aplicativo publicado: formulário, catálogo 7×5, solicitação fictícia 202, limite de reenvio 429, bloqueios de autorização e restauração da mesma sessão após recarga. O login válido de gestor continua não executado nesta ferramenta. Posteriormente, o responsável confirmou a aceitação positiva de `Experimento`: cinco respostas no Dia 2, 8/10, nível alto, `D02_ALTO_ETAPAS` concluído e 30 pontos na visão do TESTE. A evidência foi recebida do ChatGPT administrativo e não repetida nesta sessão. A restrição de EXECUTE de `rls_auto_enable()` já foi aplicada e validada no TESTE pela integração administrativa do ChatGPT, conforme atualização do responsável; não foi repetida pelo Codex. Evidências e limites completos em [Aceitação publicada](ACEITACAO_PUBLICADA.md).
 
-A comparação administrativa dos metadados ORIGINAL não foi executada nesta sessão. A main e o ORIGINAL permanecem sem alterações.
+A integração administrativa já inspecionou os metadados do ORIGINAL somente em leitura: oito tabelas, RLS ativo, índice pendente/aprovada; tabela de tentativas, RPC e visão ausentes. O Codex recebeu esse resultado sem consultar o ORIGINAL. As fontes estão separadas em [Estado dos bancos](ESTADO_BANCOS.md). A main e o conteúdo ORIGINAL permanecem sem alterações.
 
 ## Preparação do ORIGINAL
 
 A validação do servidor agora fixa também a referência ORIGINAL informada: `swbwbkslcotoecjlbqxe`. Exige `AMBIENTE=original`, URL ORIGINAL e `SUPABASE_ORIGINAL_URL_ESPERADA` iguais; recusa outro projeto mesmo se as duas variáveis coincidirem. As travas de branch `main` e contexto de produção continuam ativas; previews não podem usar ORIGINAL. Isso prepara o código e não altera a configuração do projeto hospedado.
 
-A sequência após a validação do TESTE é: obter somente metadados do ORIGINAL, comparar com o contrato, revisar os ajustes aditivos necessários e apresentar a decisão de integração/publicação ao responsável. O esquema ORIGINAL ainda não foi obtido, portanto não há afirmação de compatibilidade com esse banco.
+O [plano incremental e checklist ORIGINAL](ORIGINAL.md) utiliza os metadados resumidos já confirmados e prepara a tabela de tentativas antes da 002, normalização de grants da visão e verificação final somente leitura. Seis testes PostgreSQL locais validam esse plano, sem afirmar inspeção própria ou compatibilidade integral de definições não fornecidas. A configuração Vercel `main`/Production exclusiva está documentada; nada foi executado no ORIGINAL.
 
 ## Textos e privacidade que dependem da equipe
 
@@ -38,6 +38,6 @@ Ainda não foi definido um prazo institucional de retenção, um procedimento de
 
 ## Pendências finais
 
-1. Completar as evidências ainda ausentes de login válido do gestor, solicitação/aprovação e restauração dos registros autorizados após recarga. Check-in, classificação, desafio e 30 pontos de `Experimento` já foram confirmados pelo responsável; não repetir gravações para comprovar o que já foi validado. Revisar o título de desafio que ultrapassa a área interna em 320/375 px, sem substituir seu texto aprovado.
-2. Pela integração administrativa já autorizada, conferir metadados/ACL de `rls_auto_enable()` e avaliar a correção pontual, sem reaplicar 002; comparar exclusivamente metadados do ORIGINAL.
+1. Completar as evidências ainda ausentes de login válido do gestor, solicitação/aprovação e restauração dos registros autorizados após recarga. Check-in, classificação, desafio e 30 pontos de `Experimento` já foram confirmados pelo responsável; não repetir gravações para comprovar o que já foi validado. A responsividade foi corrigida e os 28 títulos passaram em 320/375/390 px, tablet e desktop, preservando seus textos.
+2. Revisar/aprovar o plano ORIGINAL usando o relatório administrativo já obtido; confirmar definições, grants, índices e event triggers antes de qualquer execução. A 002 e a restrição de EXECUTE no TESTE estão concluídas, sem necessidade de reaplicação.
 3. Validar textos, datas, consentimento, retenção e a aceitação final antes de decidir sobre main e publicação ORIGINAL. Não transferir dados do TESTE.
