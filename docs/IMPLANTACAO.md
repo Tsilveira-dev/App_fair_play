@@ -1,6 +1,6 @@
 # Implantação na Vercel
 
-O código está preparado para implantação. Nenhum projeto foi conectado, nenhum deploy foi executado e nenhum banco externo foi alterado por esta entrega.
+O código está preparado para implantação. Nenhum projeto Vercel foi conectado e nenhum banco externo foi alterado por esta entrega. A integração Netlify preexistente cria previews automaticamente ao abrir/atualizar o PR, inclusive no projeto fairplay-app; a trava CONTEXT/HEAD bloqueia ORIGINAL nesses previews. A produção em main não foi alterada.
 
 ## TESTE primeiro
 

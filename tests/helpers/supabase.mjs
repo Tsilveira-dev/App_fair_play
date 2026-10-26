@@ -13,7 +13,7 @@ export const SECRETA = 'sb_secret_fixture';
 
 export function preparar(t, opcoes = {}) {
   const nomes = ['AMBIENTE','SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_SECRET_KEY',
-    'SUPABASE_ORIGINAL_URL_ESPERADA','VERCEL_ENV','VERCEL_GIT_COMMIT_REF'];
+    'SUPABASE_ORIGINAL_URL_ESPERADA','VERCEL_ENV','VERCEL_GIT_COMMIT_REF','NETLIFY','CONTEXT','HEAD','BRANCH'];
   const anteriores = Object.fromEntries(nomes.map(n => [n, process.env[n]]));
   t.after(() => { for (const n of nomes) {
     if (anteriores[n] === undefined) delete process.env[n]; else process.env[n] = anteriores[n];

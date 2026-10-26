@@ -33,7 +33,7 @@ Todas têm entradas `/api/<nome>` e compatibilidade `/.netlify/functions/<nome>`
 - Check-ins e desafios recusam datas impossíveis, sem normalização silenciosa do calendário.
 - Todas as rotas do gestor exigem identidade Auth de e-mail, além do cadastro; uma identidade anônima não recebe acesso nem se cadastrada por engano.
 - Configuração pública rejeita também JWTs legados de `service_role`.
-- Previews e branches de TESTE não podem selecionar ORIGINAL. Cookies/storage de autenticação e cache passam a incluir a referência do projeto Supabase; sessões de estudantes e gestores têm chaves distintas.
+- Previews e branches de TESTE não podem selecionar ORIGINAL, tanto na Vercel quanto na Netlify (CONTEXT/HEAD). Cookies/storage de autenticação e cache passam a incluir a referência do projeto Supabase; sessões de estudantes e gestores têm chaves distintas.
 - Pontos em cache só são exibidos após sincronização; aceite não concede pontos e respostas repetidas não duplicam registros.
 - Limite de solicitações passa a ser transacional no PostgreSQL, com bloqueio compartilhado entre instâncias Vercel. Exige a RPC da migração 002.
 - SQL protege unicidade, preservação de histórico, validade e autorização no instante da gravação. A baseline recusa instalações sobre esquemas preexistentes sem revisão.
@@ -41,7 +41,7 @@ Todas têm entradas `/api/<nome>` e compatibilidade `/.netlify/functions/<nome>`
 
 ## Evidências e limites
 
-`npm run check` passou com **95 testes, zero falhas e zero ignorados**, após reinstalação com `npm ci`. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
+`npm run check` passou com **97 testes, zero falhas e zero ignorados**, após reinstalação com `npm ci`. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
 
 Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegador gráfico: layout responsivo, renderização de fontes/CDNs e teste em celular ainda exigem aceitação no ambiente TESTE publicado. O esquema externo não foi inspecionado, porque faltam as chaves de TESTE. Nenhuma conexão, execução SQL ou publicação ORIGINAL faz parte da validação realizada.
 

@@ -110,3 +110,18 @@ test('gestor: revoga sem excluir histórico e lista por filtro',async t=>{
   const r=await funcoes['gerenciar-acesso'](evento('GET',undefined,TOKEN_GESTOR,{status:'revogada'}));
   assert.equal(dados(r).sessoes.length,1); assert(!r.body.includes(UID));
 });
+
+
+test('Netlify: previews e branch deploys nunca podem usar ORIGINAL',()=>{
+  const original={AMBIENTE:'original',SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co',
+    SUPABASE_ORIGINAL_URL_ESPERADA:'https://abcdefghijklmnopqrst.supabase.co',NETLIFY:'true'};
+  assert(lerAmbienteSupabase({...original,CONTEXT:'deploy-preview',HEAD:'teste-supabase',BRANCH:'main'}).erro);
+  assert(lerAmbienteSupabase({...original,CONTEXT:'branch-deploy',HEAD:'teste-supabase'}).erro);
+  assert(lerAmbienteSupabase({...original,CONTEXT:'production',HEAD:'teste-supabase'}).erro);
+  assert.equal(lerAmbienteSupabase({...original,CONTEXT:'production',HEAD:'main'}).ambiente,'original');
+});
+test('Netlify: contexto de TESTE usa apenas seu banco e sua branch',()=>{
+  const teste={AMBIENTE:'teste',SUPABASE_URL:URL_TESTE,NETLIFY:'true',CONTEXT:'deploy-preview'};
+  assert.equal(lerAmbienteSupabase({...teste,HEAD:'teste-supabase',BRANCH:'main'}).ambiente,'teste');
+  assert(lerAmbienteSupabase({...teste,HEAD:'main'}).erro);
+});
