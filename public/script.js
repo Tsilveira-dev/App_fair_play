@@ -1,4 +1,3 @@
-
 /*
  * FAIR PLAY — SCRIPT DO ESTUDANTE
  * Ambiente: TESTE
@@ -8,47 +7,37 @@
  * Auth: Supabase.
  * Autorização: Netlify Functions.
  * Check-ins: Supabase.
- * Desafios: armazenamento local temporário.
+ * Desafios: persistência no Supabase, com confirmação pelo servidor.
  */
-
 const FUNCOES = {
   config: '/.netlify/functions/config-public',
   solicitar: '/.netlify/functions/solicitar-acesso',
   consultar: '/.netlify/functions/consultar-acesso',
-  checkin: '/.netlify/functions/checkin'
+  checkin: '/.netlify/functions/checkin',
+  desafio: '/.netlify/functions/desafio'
 };
-
 const SUPABASE_ESM =
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
-
 const CHAVE_SESSAO = 'fairplay-estudante-auth';
 const PREFIXO_ESTADO = 'fairplay-v5:';
 const INTERVALO_VERIFICACAO_MS = 30000;
 const FUSO = 'America/Fortaleza';
 const DIAS_DO_TESTE = 7;
 const TIPO_DISPOSITIVO_PADRAO = 'individual';
-
 const MSG_SEM_REGISTRO =
   'Ainda não há uma solicitação registrada para este nome. Confira o nome com a equipe e tente novamente. Se você já enviou uma solicitação antes, procure o gestor.';
-
 const MSG_CHECKIN_BLOQUEADO =
   'Os check-ins ainda não estão liberados.';
-
 const MSG_DESAFIO_BLOQUEADO =
   'Os desafios ainda não estão liberados.';
-
 const MSG_DIA8 =
   'No Dia 8 não é possível iniciar novos desafios. Você pode apenas recuperar o check-in do Dia 7.';
-
 const MSG_UM_POR_DIA =
   'Você já tem um desafio registrado para este dia do teste. Só é possível um desafio por dia.';
-
 const MSG_SEM_CONFIRMACAO =
   'Sem confirmação do servidor agora. Novos registros serão liberados quando a conexão for confirmada.';
-
 const MSG_ESPERA_FALHA =
   'Não foi possível confirmar agora. Tentaremos novamente.';
-
 const TITULOS_BLOQUEIO = {
   recusada: 'Solicitação não aceita',
   revogada: 'Acesso encerrado',
@@ -57,12 +46,10 @@ const TITULOS_BLOQUEIO = {
   periodo_encerrado: 'Período encerrado',
   erro_interno: 'Acesso indisponível'
 };
-
 const BLOQUEIO_PARTICIPANTE_INATIVO = {
   titulo: 'Seu acesso está temporariamente indisponível',
   texto: 'No momento, sua participação no Fair Play não está habilitada. Caso precise de ajuda, converse com a equipe responsável.'
 };
-
 /*
  * QUESTIONÁRIO ORIGINAL
  *
@@ -72,7 +59,6 @@ const BLOQUEIO_PARTICIPANTE_INATIVO = {
  *
  * A ordem deve coincidir com checkin.mjs.
  */
-
 const DADOS_QUESTIONARIO = [
   // DIA 1
   [
@@ -121,7 +107,6 @@ const DADOS_QUESTIONARIO = [
       ]
     ]
   ],
-
   // DIA 2
   [
     [
@@ -170,7 +155,6 @@ const DADOS_QUESTIONARIO = [
       ]
     ]
   ],
-
   // DIA 3
   [
     [
@@ -217,7 +201,6 @@ const DADOS_QUESTIONARIO = [
       ]
     ]
   ],
-
   // DIA 4
   [
     [
@@ -266,7 +249,6 @@ const DADOS_QUESTIONARIO = [
       ]
     ]
   ],
-
   // DIA 5
   [
     [
@@ -314,7 +296,6 @@ const DADOS_QUESTIONARIO = [
       ]
     ]
   ],
-
   // DIA 6
   [
     [
@@ -363,7 +344,6 @@ const DADOS_QUESTIONARIO = [
       ]
     ]
   ],
-
   // DIA 7
   [
     [
@@ -413,13 +393,11 @@ const DADOS_QUESTIONARIO = [
     ]
   ]
 ];
-
 const PERGUNTAS_POR_DIA = DADOS_QUESTIONARIO.map(
   (lista, dia) =>
     lista.map(([texto, alternativas], indice) => {
       const id =
         `D${String(dia + 1).padStart(2, '0')}_P${indice + 1}`;
-
       return {
         id,
         q: texto,
@@ -438,11 +416,9 @@ const PERGUNTAS_POR_DIA = DADOS_QUESTIONARIO.map(
       };
     })
 );
-
 function perguntasDoDia(dia) {
   return PERGUNTAS_POR_DIA[Number(dia) - 1] || [];
 }
-
 const RESULTS = {
   baixo: {
     label: 'Baixo',
@@ -473,7 +449,6 @@ const RESULTS = {
     tip: null
   }
 };
-
 const ACT = {
   study: ' Estudar ',
   sport: ' Fazer atividade física ',
@@ -482,7 +457,6 @@ const ACT = {
   family: ' Fazer algo com a família ',
   rest: ' Descansar '
 };
-
 /*
  * Desafios antigos preservados.
  * Ainda falta a integração definitiva
@@ -493,7 +467,7 @@ const CH = {
     tag: 'Missão de manutenção',
     title: '20 minutos de pausa ativa',
     min: 20,
-    pts: 30,
+    pts: 20,
     text: 'Seu equilíbrio está bom! Para mantê-lo, depois de uma sessão de jogo faça uma pausa de 20 minutos com uma atividade fora das telas.',
     list: ['sport', 'read', 'draw', 'family', 'rest']
   },
@@ -501,7 +475,7 @@ const CH = {
     tag: 'Missão de organização da rotina',
     title: '30 minutos antes do jogo',
     min: 30,
-    pts: 50,
+    pts: 20,
     text: 'Antes de iniciar sua próxima sessão de jogo, escolha uma atividade fora das telas durante 30 minutos e organize o horário do seu dia.',
     list: ['study', 'sport', 'draw', 'read', 'family']
   },
@@ -509,7 +483,7 @@ const CH = {
     tag: 'Missão Offline',
     title: '45 minutos sem telas',
     min: 45,
-    pts: 70,
+    pts: 20,
     text: 'Reduza o tempo de tela hoje: fique 45 minutos sem telas antes de jogar de novo. Comece por algo de que você goste.',
     list: ['study', 'sport', 'draw', 'read', 'family']
   },
@@ -522,13 +496,10 @@ const CH = {
     list: ['read', 'draw', 'family', 'rest']
   }
 };
-
 const C = 2 * Math.PI * 54;
-
 const $ = id => document.getElementById(id);
 const $$ = seletor => [...document.querySelectorAll(seletor)];
 const $sel = seletor => document.querySelector(seletor);
-
 let supa = null;
 let acesso = null;
 let acessoConfirmado = false;
@@ -548,11 +519,13 @@ let uidAtual = null;
 let checkinsSincronizados = false;
 let enviandoCheckin = false;
 let requisicaoCheckins = 0;
-
+let desafiosSincronizados = false;
+let enviandoDesafio = false;
+let requisicaoDesafios = 0;
+let carregamentoDesafios = null;
 /*
  * DATAS DO TESTE
  */
-
 function hojeFortaleza(agora = new Date()) {
   const partes = new Intl.DateTimeFormat(
     'en-CA',
@@ -563,40 +536,30 @@ function hojeFortaleza(agora = new Date()) {
       day: '2-digit'
     }
   ).formatToParts(agora);
-
   const pegar = tipo =>
     partes.find(p => p.type === tipo)?.value;
-
   return `${pegar('year')}-${pegar('month')}-${pegar('day')}`;
 }
-
 function somarDias(iso, quantidade) {
   const [ano, mes, dia] = iso.split('-').map(Number);
-
   return new Date(
     Date.UTC(ano, mes - 1, dia + quantidade)
   ).toISOString().slice(0, 10);
 }
-
 function diferencaDias(inicio, fim) {
   const [a, m, d] = inicio.split('-').map(Number);
   const [b, n, e] = fim.split('-').map(Number);
-
   return Math.round(
     (Date.UTC(b, n - 1, e) - Date.UTC(a, m - 1, d))
     / 86400000
   );
 }
-
 function formatarData(valor, comHora = false) {
   const entrada = /^\d{4}-\d{2}-\d{2}$/.test(valor)
     ? `${valor}T12:00:00-03:00`
     : valor;
-
   const data = new Date(entrada);
-
   if (Number.isNaN(data.getTime())) return '—';
-
   return data.toLocaleString(
     'pt-BR',
     comHora
@@ -611,7 +574,6 @@ function formatarData(valor, comHora = false) {
         }
   );
 }
-
 function formatarDataCurta(iso) {
   return new Date(
     `${iso}T12:00:00-03:00`
@@ -621,35 +583,26 @@ function formatarDataCurta(iso) {
     timeZone: FUSO
   });
 }
-
 function dataInicioTeste() {
   const inicio = acesso?.periodo?.inicio;
-
   if (!inicio) return null;
-
   if (/^\d{4}-\d{2}-\d{2}$/.test(inicio)) {
     return inicio;
   }
-
   const data = new Date(inicio);
-
   return Number.isNaN(data.getTime())
     ? null
     : hojeFortaleza(data);
 }
-
 function diaDoTeste() {
   const inicio = dataInicioTeste();
-
   return inicio
     ? diferencaDias(inicio, hojeFortaleza()) + 1
     : null;
 }
-
 /*
  * ESTADO LOCAL
  */
-
 function estadoInicial() {
   return {
     dias: {},
@@ -657,10 +610,8 @@ function estadoInicial() {
     rascunho: null
   };
 }
-
 function salvarEstado() {
   if (!uidAtual) return;
-
   try {
     localStorage.setItem(
       PREFIXO_ESTADO + uidAtual,
@@ -670,21 +621,21 @@ function salvarEstado() {
     // Armazenamento indisponível.
   }
 }
-
 function carregarEstado(uid) {
   if (uidAtual && uidAtual !== uid) {
     pauseTimer();
   }
-
   checkinsSincronizados = false;
   requisicaoCheckins++;
+  desafiosSincronizados = false;
+  requisicaoDesafios++;
+  carregamentoDesafios = null;
+  enviandoDesafio = false;
 
   uidAtual = uid;
   diaResultado = null;
   quizRenderizadoPara = null;
-
   let salvo = null;
-
   try {
     salvo = JSON.parse(
       localStorage.getItem(PREFIXO_ESTADO + uid) || 'null'
@@ -692,9 +643,7 @@ function carregarEstado(uid) {
   } catch {
     salvo = null;
   }
-
   S = estadoInicial();
-
   if (salvo && typeof salvo === 'object') {
     S.dias =
       salvo.dias &&
@@ -702,27 +651,22 @@ function carregarEstado(uid) {
       !Array.isArray(salvo.dias)
         ? salvo.dias
         : {};
-
     S.ativo =
       salvo.ativo &&
       typeof salvo.ativo === 'object'
         ? salvo.ativo
         : null;
-
     S.rascunho =
       salvo.rascunho &&
       typeof salvo.rascunho === 'object'
         ? salvo.rascunho
         : null;
   }
-
   sanitizarEstado();
 }
-
 function sanitizarEstado() {
   for (const chave of Object.keys(S.dias)) {
     const reg = S.dias[chave];
-
     if (
       !/^[1-8]$/.test(chave) ||
       !reg ||
@@ -731,55 +675,45 @@ function sanitizarEstado() {
       delete S.dias[chave];
       continue;
     }
-
     if (!Array.isArray(reg.desafios)) {
       reg.desafios = [];
     }
-
     reg.desafios = reg.desafios.filter(
       d => d && typeof d === 'object'
     );
-
     for (const d of reg.desafios) {
       if (!CH[d.nivel]) {
         d.nivel = 'mod';
       }
-
       if (
-        !['aceito', 'concluido', 'nao_concluido']
+        !['oferecido', 'aceito', 'concluido', 'nao_concluido']
           .includes(d.status)
       ) {
         d.status = 'nao_concluido';
       }
-
       if (!Number.isFinite(d.pontos)) {
         d.pontos = CH[d.nivel].pts;
       }
     }
   }
-
   if (
     S.ativo &&
     (!desafioAtivo() || desafioAtivo().status !== 'aceito')
   ) {
     S.ativo = null;
   }
-
   if (S.rascunho) {
     const r = S.rascunho;
-
     const valido =
       Number.isInteger(r.dia) &&
       Array.isArray(r.ans) &&
       perguntasDoDia(r.dia).length === 5 &&
       r.ans.length === 5;
-
     if (!valido) {
       S.rascunho = null;
     }
   }
 }
-
 function registroDoDia(n) {
   if (!S.dias[n]) {
     S.dias[n] = {
@@ -787,30 +721,23 @@ function registroDoDia(n) {
       desafios: []
     };
   }
-
   return S.dias[n];
 }
-
 function checkinDoDia(n) {
   const registro = S.dias[n]?.checkin;
-
   return registro?.origem === 'supabase'
     ? registro
     : null;
 }
-
 function desafiosDoDia(n) {
   return Array.isArray(S.dias[n]?.desafios)
     ? S.dias[n].desafios
     : [];
 }
-
 function desafioAtivo() {
   if (!S.ativo) return null;
-
   return desafiosDoDia(S.ativo.dia)[S.ativo.idx] || null;
 }
-
 class ErroFluxo extends Error {
   constructor(
     mensagem,
@@ -819,122 +746,95 @@ class ErroFluxo extends Error {
     retryAfter = null
   ) {
     super(mensagem);
-
     this.tipo = tipo;
     this.status = status;
     this.retryAfter = retryAfter;
   }
 }
-
 /*
  * CONTROLE DA INTERFACE
  */
-
 function toast(mensagem) {
   const elemento = $('toast');
-
   elemento.textContent = mensagem;
   elemento.style.opacity = 1;
-
   setTimeout(() => {
     elemento.style.opacity = 0;
   }, 2400);
 }
-
 function mostrarCarregandoAcesso(ligado) {
   $('carregandoAcesso').classList.toggle(
     'hidden',
     !ligado
   );
 }
-
 function mostrarTela(tela) {
   telaAtual = tela;
-
   if (tela !== 'app') {
     pauseTimer();
   }
-
   $('intro').classList.toggle(
     'hidden',
     !['marca', 'formulario', 'boasvindas'].includes(tela)
   );
-
   $('espera').classList.toggle(
     'hidden',
     tela !== 'espera'
   );
-
   $('bloqueio').classList.toggle(
     'hidden',
     tela !== 'bloqueio'
   );
-
   $('app').classList.toggle(
     'hidden',
     tela !== 'app'
   );
-
   $('app').classList.toggle(
     'md:flex',
     tela === 'app'
   );
 }
-
 function mostrarPassoIntro(passo) {
   $('brandStep').classList.toggle(
     'hidden',
     passo !== 'marca'
   );
-
   if (passo === 'marca') {
     $('brandStep').classList.remove('out');
   }
-
   $('nameStep').classList.toggle(
     'hidden',
     passo !== 'nome'
   );
-
   if (passo === 'nome') {
     $('nameStep').classList.add('fade-in');
   }
-
   $('welcomeStep').classList.toggle(
     'hidden',
     passo !== 'boasvindas'
   );
 }
-
 function mostrarFormulario(mensagem = '') {
   pararVerificacao();
   mostrarTela('formulario');
   mostrarPassoIntro('nome');
-
   $('formAviso').textContent = mensagem;
   $('nameSubmit').disabled = enviando || !supa;
 }
-
 function mostrarEspera(nome, aviso = '') {
   mostrarTela('espera');
-
   $('esperaNome').textContent = nome || '';
-
   if (aviso) {
     $('esperaUltima').textContent = aviso;
   }
-
   ativarVerificacao();
 }
-
 function mostrarBloqueio(titulo, texto) {
   pararVerificacao();
   mostrarTela('bloqueio');
-
   $('bloqueioTitulo').textContent = titulo;
   $('bloqueioTexto').textContent = texto;
 }
-
 function registrarVerificacao() {
   const hora = new Date().toLocaleTimeString(
     'pt-BR',
@@ -944,49 +844,39 @@ function registrarVerificacao() {
       timeZone: FUSO
     }
   );
-
   $('esperaUltima').textContent =
     `Última verificação às ${hora}`;
 }
-
 function ativarVerificacao() {
   pararVerificacao();
-
   if (document.hidden) return;
-
   timerVerificacao = setInterval(
     () => verificarAgora({ silencioso: true }),
     INTERVALO_VERIFICACAO_MS
   );
 }
-
 function pararVerificacao() {
   clearInterval(timerVerificacao);
   timerVerificacao = null;
 }
-
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     pararVerificacao();
     return;
   }
-
   if (telaAtual === 'espera' || telaAtual === 'app') {
     verificarAgora({ silencioso: true });
     ativarVerificacao();
   }
 });
-
 window.addEventListener('online', () => {
   if (telaAtual === 'espera' || telaAtual === 'app') {
     verificarAgora({ silencioso: true });
   }
 });
-
 /*
  * AUTENTICAÇÃO
  */
-
 async function iniciarCliente() {
   const resposta = await fetch(
     FUNCOES.config,
@@ -997,22 +887,17 @@ async function iniciarCliente() {
       cache: 'no-store'
     }
   );
-
   if (!resposta.ok) {
     throw new Error('Configuração indisponível.');
   }
-
   const config = await resposta.json();
-
   if (
     !config.supabaseUrl ||
     !config.supabasePublishableKey
   ) {
     throw new Error('Configuração inválida.');
   }
-
   const { createClient } = await import(SUPABASE_ESM);
-
   supa = createClient(
     config.supabaseUrl,
     config.supabasePublishableKey,
@@ -1026,19 +911,19 @@ async function iniciarCliente() {
     }
   );
 }
-
 async function sessaoLocal() {
   const { data, error } =
     await supa.auth.getSession();
-
   return error ? null : data?.session || null;
 }
-
 async function encerrarSessao() {
   pararVerificacao();
   pauseTimer();
-
   requisicaoCheckins++;
+  requisicaoDesafios++;
+  desafiosSincronizados = false;
+  carregamentoDesafios = null;
+  enviandoDesafio = false;
 
   acesso = null;
   acessoConfirmado = false;
@@ -1047,7 +932,6 @@ async function encerrarSessao() {
   S = estadoInicial();
   diaResultado = null;
   quizRenderizadoPara = null;
-
   try {
     if (supa) {
       await supa.auth.signOut();
@@ -1056,24 +940,19 @@ async function encerrarSessao() {
     // Ignora falha ao encerrar sessão.
   }
 }
-
 function mensagemFalhaAcesso(erro) {
   return erro?.status === 429
     ? 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.'
     : 'Não foi possível iniciar seu acesso agora. Verifique sua internet e tente novamente.';
 }
-
 async function postServidor(url, { token, corpo } = {}) {
   const headers = {};
-
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-
   if (corpo !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
-
   try {
     return await fetch(url, {
       method: 'POST',
@@ -1090,7 +969,6 @@ async function postServidor(url, { token, corpo } = {}) {
     );
   }
 }
-
 async function lerJson(resposta) {
   try {
     return await resposta.json();
@@ -1098,47 +976,38 @@ async function lerJson(resposta) {
     return {};
   }
 }
-
 async function tokenDaSessao(renovar = false) {
   if (renovar) {
     const { data, error } =
       await supa.auth.refreshSession();
-
     if (error || !data?.session) {
       throw new ErroFluxo(
         'Não foi possível confirmar sua sessão.',
         'sessao'
       );
     }
-
     return data.session.access_token;
   }
-
   const sessao = await sessaoLocal();
-
   if (!sessao) {
     throw new ErroFluxo(
       'Sessão ausente.',
       'sessao'
     );
   }
-
   return sessao.access_token;
 }
-
 async function consultarServidor() {
   let resposta = await postServidor(
     FUNCOES.consultar,
     { token: await tokenDaSessao() }
   );
-
   if (resposta.status === 401) {
     resposta = await postServidor(
       FUNCOES.consultar,
       { token: await tokenDaSessao(true) }
     );
   }
-
   if ([401, 403].includes(resposta.status)) {
     throw new ErroFluxo(
       'Sessão inválida.',
@@ -1146,9 +1015,7 @@ async function consultarServidor() {
       resposta.status
     );
   }
-
   const dados = await lerJson(resposta);
-
   if (!resposta.ok) {
     throw new ErroFluxo(
       dados.erro || 'Não foi possível verificar seu acesso agora.',
@@ -1156,17 +1023,13 @@ async function consultarServidor() {
       resposta.status
     );
   }
-
   return dados;
 }
-
 /*
  * CHECK-INS NO SUPABASE
  */
-
 function aplicarCheckinRemoto(registro) {
   const dia = Number(registro?.dia_numero);
-
   if (
     !Number.isInteger(dia) ||
     dia < 1 ||
@@ -1174,7 +1037,6 @@ function aplicarCheckinRemoto(registro) {
   ) {
     return;
   }
-
   registroDoDia(dia).checkin = {
     origem: 'supabase',
     respostas: registro.respostas,
@@ -1186,13 +1048,10 @@ function aplicarCheckinRemoto(registro) {
     recuperado: registro.enviado_atrasado === true
   };
 }
-
 async function carregarCheckinsServidor() {
   checkinsSincronizados = false;
-
   const minhaRequisicao = ++requisicaoCheckins;
   const uidInicial = uidAtual;
-
   let resposta = await fetch(
     FUNCOES.checkin,
     {
@@ -1203,7 +1062,6 @@ async function carregarCheckinsServidor() {
       cache: 'no-store'
     }
   );
-
   if (resposta.status === 401) {
     resposta = await fetch(
       FUNCOES.checkin,
@@ -1216,81 +1074,62 @@ async function carregarCheckinsServidor() {
       }
     );
   }
-
   if (!resposta.ok) {
     throw new Error(
       'Não foi possível carregar os check-ins.'
     );
   }
-
   const dados = await resposta.json();
-
   if (!Array.isArray(dados.checkins)) {
     throw new Error(
       'Resposta inválida do servidor.'
     );
   }
-
   if (
     minhaRequisicao !== requisicaoCheckins ||
     uidInicial !== uidAtual
   ) {
     return;
   }
-
   for (let dia = 1; dia <= 7; dia++) {
     const local = registroDoDia(dia);
-
     if (
       local.checkin &&
       local.checkin.origem !== 'supabase'
     ) {
       local.checkinAnteriorLocal = local.checkin;
     }
-
     local.checkin = null;
   }
-
   dados.checkins.forEach(aplicarCheckinRemoto);
-
   checkinsSincronizados = true;
-
   salvarEstado();
   atualizarBloqueios();
 }
-
 function vinculado() {
   return !!acesso &&
     !!acesso.status &&
     acesso.status !== 'sem_solicitacao';
 }
-
 function podeRegistrar() {
   return coletaLiberada() && acessoConfirmado;
 }
-
 async function verificarAgora({
   silencioso = false,
   aposEnvio = false
 } = {}) {
   const minha = ++seqAcesso;
-
   if (!silencioso) {
     mostrarCarregandoAcesso(true);
   }
-
   try {
     const dados = await consultarServidor();
-
     if (minha !== seqAcesso) return;
-
     acessoConfirmado = true;
     registrarVerificacao();
-
     aplicarAcesso(dados, { aposEnvio });
   } catch (erro) {
     if (minha !== seqAcesso) return;
-
     tratarFalhaVerificacao(
       erro,
       { silencioso }
@@ -1301,13 +1140,11 @@ async function verificarAgora({
     }
   }
 }
-
 function tratarFalhaVerificacao(
   erro,
   { silencioso }
 ) {
   acessoConfirmado = false;
-
   if (erro.tipo === 'sessao') {
     if (vinculado()) {
       mostrarBloqueio(
@@ -1321,14 +1158,11 @@ function tratarFalhaVerificacao(
         )
       );
     }
-
     return;
   }
-
   const mensagem =
     erro.message ||
     'Não foi possível verificar seu acesso agora.';
-
   if (
     telaAtual === 'formulario' &&
     solicitacaoEnviada
@@ -1339,53 +1173,44 @@ function tratarFalhaVerificacao(
     );
     return;
   }
-
   if (telaAtual === 'espera') {
     $('esperaUltima').textContent =
       `${mensagem} ${MSG_ESPERA_FALHA}`;
     return;
   }
-
   if (telaAtual === 'app') {
     atualizarBloqueios();
-
     if (!silencioso) {
       toast(mensagem);
     }
     return;
   }
-
   mostrarBloqueio(
     'Não foi possível verificar seu acesso',
     mensagem
   );
 }
-
 function aplicarAcesso(
   dados,
   { aposEnvio = false } = {}
 ) {
   acesso = dados;
-
   if (dados.pode_entrar === true) {
     entrarNoApp(aposEnvio);
     return;
   }
-
   if (dados.motivo === 'aguardando_autorizacao') {
     mostrarEspera(
       dados.nome || ultimoNomeEnviado
     );
     return;
   }
-
   if (dados.motivo === 'sem_solicitacao') {
     mostrarFormulario(
       aposEnvio ? MSG_SEM_REGISTRO : ''
     );
     return;
   }
-
   if (dados.motivo === 'participante_inativo') {
     mostrarBloqueio(
       BLOQUEIO_PARTICIPANTE_INATIVO.titulo,
@@ -1393,7 +1218,6 @@ function aplicarAcesso(
     );
     return;
   }
-
   mostrarBloqueio(
     TITULOS_BLOQUEIO[dados.motivo] ||
       'Acesso indisponível',
@@ -1401,14 +1225,12 @@ function aplicarAcesso(
       'Procure a equipe para verificar seu acesso.'
   );
 }
-
 function coletaLiberada() {
   return !!acesso &&
     acesso.pode_entrar === true &&
     acesso.coleta_liberada === true &&
     dataInicioTeste() !== null;
 }
-
 function textoBloqueio(tipo) {
   if (
     acesso?.fase === 'antes_do_inicio' &&
@@ -1416,67 +1238,62 @@ function textoBloqueio(tipo) {
   ) {
     return `Os ${tipo} começam em ${formatarData(acesso.periodo.inicio)}. Até lá, você pode explorar o aplicativo.`;
   }
-
   return `Os ${tipo} ainda não estão liberados.`;
 }
-
 function entrarNoApp(comBoasVindas) {
   const nome = acesso?.nome || '';
-
   $('greet').textContent = `Olá, ${nome}`;
   $('sideName').textContent = nome;
   $('hello').textContent = 'Seja bem-vindo(a)';
   $('whoName').textContent = nome;
-
   if (telaAtual === 'app') {
     atualizarBloqueios();
-
     if (!checkinsSincronizados) {
       carregarCheckinsServidor().catch(() => {});
     }
-
+    if (coletaLiberada() && !desafiosSincronizados && !carregamentoDesafios) {
+      carregarDesafiosServidor().catch(() => {});
+    }
     return;
   }
-
   if (comBoasVindas) {
     pararVerificacao();
     mostrarTela('boasvindas');
     mostrarPassoIntro('boasvindas');
-
     setTimeout(() => {
       if (telaAtual === 'boasvindas') {
         abrirApp();
       }
     }, 2400);
-
     return;
   }
-
   abrirApp();
 }
-
 function abrirApp() {
   mostrarTela('app');
   mostrarSecao(secaoAtual || 'home');
   atualizarBloqueios();
   ativarVerificacao();
-
   carregarCheckinsServidor().catch(() => {
     checkinsSincronizados = false;
     atualizarBloqueios();
-
     toast(
       'Não foi possível sincronizar os check-ins. Tente novamente ou atualize a página.'
     );
   });
-}
 
+  if (coletaLiberada()) {
+    carregarDesafiosServidor().catch(() => {
+      desafiosSincronizados = false;
+      atualizarBloqueios();
+      toast('Não foi possível sincronizar os desafios. Atualize a página.');
+    });
+  }
+}
 function atualizarBanner() {
   const banner = $('periodoBanner');
   const dia = diaDoTeste();
-
   let texto = '';
-
   if (acesso?.pode_entrar === true) {
     if (!acessoConfirmado) {
       texto = MSG_SEM_CONFIRMACAO;
@@ -1494,32 +1311,25 @@ function atualizarBanner() {
         `Check-ins abertos até ${formatarData(acesso.periodo.fim, true)}.`;
     }
   }
-
   banner.textContent = texto;
   banner.classList.toggle('hidden', !texto);
-
   $('homeComecarNota').textContent =
     coletaLiberada()
       ? '5 perguntas por dia'
       : 'Disponível quando os check-ins forem liberados';
 }
-
 function atualizarBloqueios() {
   atualizarBanner();
   sincronizarDesafioAtivo();
-
   if (!coletaLiberada()) {
     pauseTimer();
   }
-
   if (secaoAtual === 'checkin') renderCheckin();
   if (secaoAtual === 'challenge') renderChallenge();
   if (secaoAtual === 'progress') renderProgress();
 }
-
 function sincronizarDesafioAtivo() {
   const desafio = desafioAtivo();
-
   if (!desafio) {
     if (S.ativo) {
       S.ativo = null;
@@ -1527,88 +1337,70 @@ function sincronizarDesafioAtivo() {
     }
     return;
   }
-
   if (!running && desafio.prazo) {
     desafio.rem = restanteDoDesafio(desafio);
     desafio.prazo = null;
     salvarEstado();
   }
-
   const dia = diaDoTeste();
-
   if (dia !== null && dia !== S.ativo.dia) {
+    // O registro permanece no Supabase. Apenas encerramos o acesso local
+    // ao desafio do dia anterior, sem fingir que o banco foi alterado.
     descartarDesafioAtivo();
     return;
   }
-
   if (!coletaLiberada()) {
     pauseTimer();
   }
 }
-
 /*
  * NOME E SOLICITAÇÃO DE ACESSO
  */
-
 function construirMarca() {
   [...'Fair Play'].forEach((caractere, indice) => {
     const letra = document.createElement('span');
-
     letra.className = 'brand-letter';
     letra.style.animationDelay =
       (0.2 + indice * 0.09) + 's';
-
     letra.textContent =
       caractere === ' ' ? '\u00a0' : caractere;
-
     $('brandWord').appendChild(letra);
   });
 }
-
 function validarNomeEstudante(valor) {
   const nome = valor.trim();
-
   if (!nome) {
     return 'Digite seu primeiro nome para continuar.';
   }
-
   if (nome.length < 2) {
     return 'Informe pelo menos 2 letras.';
   }
-
   if (nome.length > 40) {
     return 'Use no máximo 40 caracteres.';
   }
-
   if (/\s/.test(nome)) {
     return 'Informe somente o seu primeiro nome.';
   }
-
   if (!/^\p{L}[\p{L}'’-]*$/u.test(nome)) {
     return 'Use apenas letras, sem números ou símbolos.';
   }
-
   return '';
 }
-
 function mensagemErroSolicitacao(resposta) {
   if (resposta.status === 429) {
     const segundos = Number(
       resposta.headers.get('Retry-After')
     ) || 0;
-
     const minutos = Math.max(
       1,
       Math.ceil(segundos / 60)
     );
-
     return new ErroFluxo(
       `Muitas tentativas em pouco tempo. Aguarde cerca de ${minutos} minuto(s) e tente novamente.`,
       'limite',
       429
     );
   }
-
   if (resposta.status === 400) {
     return new ErroFluxo(
       'Confira o primeiro nome (somente letras) e tente novamente.',
@@ -1616,7 +1408,6 @@ function mensagemErroSolicitacao(resposta) {
       400
     );
   }
-
   if ([401, 403].includes(resposta.status)) {
     return new ErroFluxo(
       'Não foi possível confirmar sua sessão. Tente novamente.',
@@ -1624,23 +1415,18 @@ function mensagemErroSolicitacao(resposta) {
       resposta.status
     );
   }
-
   return new ErroFluxo(
     'Não foi possível registrar sua solicitação agora. Tente novamente.',
     'servidor',
     resposta.status
   );
 }
-
 function definirEnvio(ligado) {
   enviando = ligado;
-
   $('nameSubmit').disabled = ligado || !supa;
   $('nameSubmit').textContent =
     ligado ? 'ENVIANDO...' : 'CONTINUAR';
-
   $('nameInput').disabled = ligado;
-
   if (ligado) {
     $('formAviso').textContent =
       'Enviando sua solicitação...';
@@ -1651,54 +1437,41 @@ function definirEnvio(ligado) {
     $('formAviso').textContent = '';
   }
 }
-
 async function enviarSolicitacao() {
   if (enviando) return;
-
   const nome = $('nameInput').value.trim();
-
   $('nameErr').textContent = '';
   $('formAviso').textContent = '';
-
   const erroNome = validarNomeEstudante(nome);
-
   if (erroNome) {
     $('nameErr').textContent = erroNome;
     $('nameInput').focus();
     return;
   }
-
   if (!supa) {
     $('formAviso').textContent =
       'Não foi possível conectar. Atualize a página.';
     return;
   }
-
   ultimoNomeEnviado = nome;
   solicitacaoEnviada = false;
   definirEnvio(true);
-
   try {
     let sessao = await sessaoLocal();
-
     if (!sessao) {
       const { data, error } =
         await supa.auth.signInAnonymously();
-
       if (error || !data?.session) {
         throw new ErroFluxo(
           mensagemFalhaAcesso(error),
           'auth'
         );
       }
-
       sessao = data.session;
     }
-
     if (uidAtual !== sessao.user.id) {
       carregarEstado(sessao.user.id);
     }
-
     const resposta = await postServidor(
       FUNCOES.solicitar,
       {
@@ -1709,13 +1482,10 @@ async function enviarSolicitacao() {
         }
       }
     );
-
     if (resposta.status !== 202) {
       throw mensagemErroSolicitacao(resposta);
     }
-
     solicitacaoEnviada = true;
-
     await verificarAgora({
       aposEnvio: true
     });
@@ -1723,7 +1493,6 @@ async function enviarSolicitacao() {
     if (erro.tipo === 'sessao') {
       await encerrarSessao();
     }
-
     $('formAviso').textContent =
       erro.message ||
       'Algo deu errado. Tente novamente.';
@@ -1731,32 +1500,24 @@ async function enviarSolicitacao() {
     definirEnvio(false);
   }
 }
-
 /*
  * NAVEGAÇÃO
  */
-
 function go(id) {
   mostrarSecao(id);
 }
-
 function mostrarSecao(id) {
   if (telaAtual !== 'app' || !$(id)) {
     return;
   }
-
   secaoAtual = id;
-
   $$('.screen').forEach(tela => {
     tela.classList.add('hidden');
   });
-
   $(id).classList.remove('hidden');
-
   $(id).style.animation = 'none';
   void $(id).offsetWidth;
   $(id).style.animation = '';
-
   $$('[data-nav]').forEach(botao => {
     botao.classList.toggle(
       'active',
@@ -1764,30 +1525,24 @@ function mostrarSecao(id) {
         (id === 'result' ? 'checkin' : id)
     );
   });
-
   if (id === 'checkin') renderCheckin();
   if (id === 'result') showResult();
   if (id === 'challenge') renderChallenge();
   if (id === 'progress') renderProgress();
-
   window.scrollTo({
     top: 0,
     behavior: 'smooth'
   });
 }
-
 document.addEventListener('click', evento => {
   const botao = evento.target.closest('[data-go]');
-
   if (botao) {
     go(botao.dataset.go);
   }
 });
-
 /*
  * QUESTIONÁRIO DIÁRIO
  */
-
 function estadoCheckin() {
   if (!coletaLiberada()) {
     return {
@@ -1795,7 +1550,6 @@ function estadoCheckin() {
       texto: textoBloqueio('check-ins')
     };
   }
-
   if (!checkinsSincronizados) {
     return {
       tipo: 'sem_confirmacao',
@@ -1803,10 +1557,8 @@ function estadoCheckin() {
         'Confirmando os check-ins salvos no Supabase. Aguarde ou atualize a página.'
     };
   }
-
   const dia = diaDoTeste();
   let estado;
-
   if (dia === DIAS_DO_TESTE + 1) {
     estado = checkinDoDia(DIAS_DO_TESTE)
       ? {
@@ -1839,7 +1591,6 @@ function estadoCheckin() {
       texto: MSG_CHECKIN_BLOQUEADO
     };
   }
-
   if (
     ['novo', 'recuperacao'].includes(estado.tipo) &&
     !acessoConfirmado
@@ -1849,41 +1600,32 @@ function estadoCheckin() {
       texto: MSG_SEM_CONFIRMACAO
     };
   }
-
   return estado;
 }
-
 function renderCheckin() {
   const estado = estadoCheckin();
   const caixa = $('checkinBloqueio');
-
   const bloqueado =
     estado.tipo === 'bloqueado' ||
     estado.tipo === 'sem_confirmacao';
-
   caixa.classList.toggle(
     'hidden',
     estado.tipo === 'novo'
   );
-
   caixa.classList.toggle(
     'aviso-alerta',
     bloqueado
   );
-
   caixa.classList.toggle(
     'aviso-info',
     !bloqueado
   );
-
   $('checkinBloqueioTexto').textContent =
     estado.texto || '';
-
   $('quizArea').classList.toggle(
     'hidden',
     bloqueado
   );
-
   if (
     estado.tipo === 'novo' ||
     estado.tipo === 'recuperacao'
@@ -1893,16 +1635,13 @@ function renderCheckin() {
     limparQuiz();
   }
 }
-
 function renderQuiz(dia) {
   const perguntas = perguntasDoDia(dia);
-
   if (perguntas.length !== 5) {
     $('quizErr').textContent =
       'Questionário indisponível para este dia.';
     return;
   }
-
   if (
     !S.rascunho ||
     S.rascunho.dia !== dia ||
@@ -1913,17 +1652,13 @@ function renderQuiz(dia) {
       dia,
       ans: perguntas.map(() => null)
     };
-
     salvarEstado();
   }
-
   if (quizRenderizadoPara === dia) {
     return;
   }
-
   quizRenderizadoPara = dia;
   $('quizErr').textContent = '';
-
   $('quiz').innerHTML = perguntas.map((pergunta, i) => `
     <div class="q" data-q="${i}">
       <h2 class="qt font-display font-bold text-lg mb-3">
@@ -1942,68 +1677,51 @@ function renderQuiz(dia) {
     </div>
   `).join('');
 }
-
 function limparQuiz() {
   quizRenderizadoPara = null;
   $('quiz').innerHTML = '';
   $('quizErr').textContent = '';
 }
-
 function abrirResultado(dia) {
   diaResultado = dia;
   go('result');
 }
-
 $('quiz').addEventListener('click', evento => {
   const botao = evento.target.closest('.opt');
-
   if (!botao) return;
-
   const estado = estadoCheckin();
-
   if (!['novo', 'recuperacao'].includes(estado.tipo)) {
     toast(
       estado.texto || MSG_CHECKIN_BLOQUEADO
     );
     return;
   }
-
   if (
     !S.rascunho ||
     S.rascunho.dia !== estado.alvo
   ) {
     return;
   }
-
   const indice = Number(botao.dataset.q);
-
   S.rascunho.ans[indice] =
     Number(botao.dataset.v);
-
   salvarEstado();
-
   $$(`.opt[data-q="${indice}"]`).forEach(opcao => {
     opcao.classList.toggle(
       'sel',
       opcao === botao
     );
   });
-
   $sel(`.q[data-q="${indice}"]`)
     ?.classList.remove('missing');
-
   $('quizErr').textContent = '';
 });
-
 /*
  * ENVIO DEFINITIVO DO CHECK-IN
  */
-
 $('seeResult').addEventListener('click', async () => {
   if (enviandoCheckin) return;
-
   const estado = estadoCheckin();
-
   if (
     estado.tipo === 'ja_feito' ||
     estado.tipo === 'dia8_fechado'
@@ -2011,28 +1729,23 @@ $('seeResult').addEventListener('click', async () => {
     abrirResultado(estado.alvo);
     return;
   }
-
   if (!['novo', 'recuperacao'].includes(estado.tipo)) {
     toast(
       estado.texto || MSG_CHECKIN_BLOQUEADO
     );
     return;
   }
-
   const perguntas =
     perguntasDoDia(estado.alvo);
-
   const respostas =
     S.rascunho?.dia === estado.alvo
       ? S.rascunho.ans
       : [];
-
   if (perguntas.length !== 5) {
     $('quizErr').textContent =
       'Questionário indisponível.';
     return;
   }
-
   const faltando = perguntas
     .map((pergunta, i) =>
       !Number.isInteger(respostas[i]) ||
@@ -2041,35 +1754,28 @@ $('seeResult').addEventListener('click', async () => {
         : -1
     )
     .filter(i => i >= 0);
-
   if (faltando.length) {
     faltando.forEach(i => {
       $sel(`.q[data-q="${i}"]`)
         ?.classList.add('missing');
     });
-
     $('quizErr').textContent =
       'Responda todas as cinco perguntas.';
-
     $sel(`.q[data-q="${faltando[0]}"]`)
       ?.scrollIntoView({
         behavior: 'smooth',
         block: 'center'
       });
-
     return;
   }
-
   const alternativas = perguntas.map(
     (pergunta, i) =>
       pergunta.o[respostas[i]].id
   );
-
   enviandoCheckin = true;
   $('seeResult').disabled = true;
   $('quizErr').textContent =
     'Salvando suas respostas...';
-
   try {
     let resposta = await postServidor(
       FUNCOES.checkin,
@@ -2078,7 +1784,6 @@ $('seeResult').addEventListener('click', async () => {
         corpo: { respostas: alternativas }
       }
     );
-
     if (resposta.status === 401) {
       resposta = await postServidor(
         FUNCOES.checkin,
@@ -2088,44 +1793,34 @@ $('seeResult').addEventListener('click', async () => {
         }
       );
     }
-
     if (resposta.status === 409) {
       await carregarCheckinsServidor();
-
       if (checkinDoDia(estado.alvo)) {
         S.rascunho = null;
         salvarEstado();
         abrirResultado(estado.alvo);
         return;
       }
-
       throw new Error(
         'Check-in já registrado.'
       );
     }
-
     if (!resposta.ok) {
       const dados = await lerJson(resposta);
-
       throw new Error(
         dados.erro ||
         'Não foi possível salvar o check-in.'
       );
     }
-
     const dados = await resposta.json();
-
     if (!dados.checkin) {
       throw new Error(
         'Servidor não confirmou o registro.'
       );
     }
-
     aplicarCheckinRemoto(dados.checkin);
-
     S.rascunho = null;
     salvarEstado();
-
     $('quizErr').textContent = '';
     abrirResultado(estado.alvo);
   } catch (erro) {
@@ -2136,50 +1831,180 @@ $('seeResult').addEventListener('click', async () => {
     $('seeResult').disabled = false;
   }
 });
-
 /*
  * TELA DE RESULTADO SEM ÍCONES COLORIDOS
  */
-
 function showResult() {
   const checkin = diaResultado
     ? checkinDoDia(diaResultado)
     : null;
-
   if (!checkin) {
     go('checkin');
     return;
   }
-
   const resultado =
     RESULTS[checkin.nivel] ||
     RESULTS.neutro;
-
   $('resTitle').textContent = resultado.title;
   $('resText').textContent = resultado.text;
   $('resRec').textContent = resultado.rec;
-
   $('resTipCard').classList.toggle(
     'hidden',
     !resultado.tip
   );
-
   $('resTip').textContent =
     resultado.tip || '';
-
   $('lvlLabel').textContent =
     resultado.label;
-
   $('lvlLabel').style.color = '';
 }
-
 /*
  * DESAFIOS
  */
+/*
+ * DESAFIOS — SERVIDOR É A FONTE DA VERDADE.
+ * A interface não cria nem conclui desafios antes da confirmação.
+ */
+async function requisitarDesafio(acao = null) {
+  async function executar(token) {
+    if (acao) {
+      return postServidor(FUNCOES.desafio, {
+        token,
+        corpo: { acao }
+      });
+    }
+    try {
+      return await fetch(FUNCOES.desafio, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store'
+      });
+    } catch {
+      throw new Error('Sem conexão com o servidor de desafios.');
+    }
+  }
+
+  let resposta = await executar(await tokenDaSessao());
+  if (resposta.status === 401) {
+    resposta = await executar(await tokenDaSessao(true));
+  }
+  const dados = await lerJson(resposta);
+  if (!resposta.ok) {
+    const erro = new Error(
+      dados.erro || `Falha ao acessar os desafios (${resposta.status}).`
+    );
+    erro.status = resposta.status;
+    throw erro;
+  }
+  return dados;
+}
+
+function normalizarDesafioRemoto(registro, anterior = null) {
+  const nivel = registro.nivel_atribuido === 'moderado'
+    ? 'mod'
+    : ['baixo', 'alto'].includes(registro.nivel_atribuido)
+      ? registro.nivel_atribuido
+      : 'neutro';
+  const tempoInicial = CH[nivel].min * 60;
+  const mesmoCodigo = anterior?.codigo === registro.codigo_desafio;
+  const aceito = registro.status === 'aceito';
+  return {
+    origem: 'supabase',
+    codigo: registro.codigo_desafio,
+    nivel,
+    status: registro.status,
+    pontos: 20,
+    aceitoEm: registro.aceito_em,
+    concluidoEm: registro.concluido_em,
+    rem: aceito && mesmoCodigo && Number.isFinite(anterior?.rem)
+      ? Math.max(0, Math.min(tempoInicial, anterior.rem))
+      : tempoInicial,
+    prazo: aceito && mesmoCodigo ? anterior.prazo || null : null,
+    timerIniciado: aceito && mesmoCodigo
+      ? anterior.timerIniciado === true
+      : false
+  };
+}
+
+function aplicarDesafioRemoto(registro) {
+  const dia = Number(registro?.dia_numero);
+  if (!Number.isInteger(dia) || dia < 1 || dia > DIAS_DO_TESTE) {
+    return false;
+  }
+  if (!registro?.codigo_desafio ||
+      !['oferecido', 'aceito', 'concluido'].includes(registro.status)) {
+    return false;
+  }
+  const anterior = desafiosDoDia(dia)[0] || null;
+  const local = normalizarDesafioRemoto(registro, anterior);
+  registroDoDia(dia).desafios = [local];
+  if (local.status === 'aceito' && dia === diaDoTeste()) {
+    S.ativo = { dia, idx: 0 };
+  } else if (S.ativo?.dia === dia) {
+    S.ativo = null;
+  }
+  salvarEstado();
+  return true;
+}
+
+async function carregarDesafiosServidor() {
+  if (carregamentoDesafios) return carregamentoDesafios;
+  const atual = ++requisicaoDesafios;
+  const usuario = uidAtual;
+
+  const promessa = (async () => {
+    const dados = await requisitarDesafio();
+    if (!Array.isArray(dados.desafios)) {
+      throw new Error('Resposta inválida do servidor de desafios.');
+    }
+    if (atual !== requisicaoDesafios || usuario !== uidAtual) return;
+
+    const anteriores = new Map();
+    for (let dia = 1; dia <= DIAS_DO_TESTE; dia++) {
+      for (const desafio of desafiosDoDia(dia)) {
+        if (desafio?.origem === 'supabase' && desafio.codigo) {
+          anteriores.set(desafio.codigo, desafio);
+        }
+      }
+      registroDoDia(dia).desafios = [];
+    }
+    S.ativo = null;
+    for (const remoto of dados.desafios) {
+      const dia = Number(remoto.dia_numero);
+      if (!Number.isInteger(dia) || dia < 1 || dia > DIAS_DO_TESTE ||
+          !remoto.codigo_desafio ||
+          !['oferecido', 'aceito', 'concluido'].includes(remoto.status)) {
+        continue;
+      }
+      const antigo = anteriores.get(remoto.codigo_desafio) || null;
+      const desafio = normalizarDesafioRemoto(remoto, antigo);
+      registroDoDia(dia).desafios = [desafio];
+      if (desafio.status === 'aceito' && dia === diaDoTeste()) {
+        S.ativo = { dia, idx: 0 };
+      }
+    }
+    if (!S.ativo && running) {
+      clearInterval(iv);
+      iv = null;
+      running = false;
+    }
+    desafiosSincronizados = true;
+    salvarEstado();
+    atualizarBloqueios();
+  })();
+
+  carregamentoDesafios = promessa;
+  try {
+    await promessa;
+  } finally {
+    if (carregamentoDesafios === promessa) {
+      carregamentoDesafios = null;
+    }
+  }
+}
 
 function nivelHoje() {
   const dia = diaDoTeste();
-
   if (
     dia === null ||
     dia < 1 ||
@@ -2187,39 +2012,29 @@ function nivelHoje() {
   ) {
     return null;
   }
-
   return checkinDoDia(dia)?.nivel || null;
 }
-
 function nivelDesafioNovo() {
   const hoje = nivelHoje();
-
   if (hoje) return hoje;
-
   const dia = diaDoTeste();
-
   const limite = dia === null
     ? DIAS_DO_TESTE
     : Math.min(
         Math.max(dia, 0),
         DIAS_DO_TESTE
       );
-
   for (let n = limite; n >= 1; n--) {
     const checkin = checkinDoDia(n);
-
     if (checkin) {
       return checkin.nivel || 'neutro';
     }
   }
-
   return 'neutro';
 }
-
 function restanteDoDesafio(desafio) {
   const total =
     CH[desafio.nivel].min * 60;
-
   const restante = desafio.prazo
     ? Math.ceil(
         (desafio.prazo - Date.now()) / 1000
@@ -2227,13 +2042,11 @@ function restanteDoDesafio(desafio) {
     : Number.isFinite(desafio.rem)
       ? Math.floor(desafio.rem)
       : total;
-
   return Math.min(
     total,
     Math.max(0, restante)
   );
 }
-
 function formatarTempo(segundos) {
   return `${
     String(Math.floor(segundos / 60)).padStart(2, '0')
@@ -2241,51 +2054,42 @@ function formatarTempo(segundos) {
     String(segundos % 60).padStart(2, '0')
   }`;
 }
-
 function draw() {
   const desafio = desafioAtivo();
-
   if (!desafio) return;
-
   const total =
     CH[desafio.nivel].min * 60;
-
   const restante =
     restanteDoDesafio(desafio);
-
   $('clock').textContent =
     formatarTempo(restante);
-
   $('ring').style.strokeDasharray = C;
   $('ring').style.strokeDashoffset =
     C * (1 - restante / total);
 }
-
 function atualizarBotoesTimer() {
   const desafio = desafioAtivo();
-
   const restante = desafio
     ? restanteDoDesafio(desafio)
     : 0;
-
-  $('pause').textContent =
-    running ? 'PAUSAR' : 'RETOMAR';
-
+  $('pause').textContent = running
+    ? 'PAUSAR'
+    : desafio?.timerIniciado ? 'RETOMAR' : 'INICIAR CRONÔMETRO';
   $('pause').disabled =
     !desafio ||
     !coletaLiberada() ||
+    !desafiosSincronizados ||
+    enviandoDesafio ||
     (!running && restante <= 0);
-
   $('finish').disabled =
     !desafio ||
-    !podeRegistrar();
+    !podeRegistrar() ||
+    !desafiosSincronizados ||
+    enviandoDesafio;
 }
-
 function startTimer() {
   if (running) return;
-
   const desafio = desafioAtivo();
-
   if (
     !desafio ||
     desafio.status !== 'aceito' ||
@@ -2293,61 +2097,45 @@ function startTimer() {
   ) {
     return;
   }
-
   const restante =
     restanteDoDesafio(desafio);
-
   if (restante <= 0) {
     draw();
     atualizarBotoesTimer();
     return;
   }
-
   clearInterval(iv);
-
   desafio.rem = restante;
   desafio.prazo =
     Date.now() + restante * 1000;
-
+  desafio.timerIniciado = true;
   running = true;
-
   salvarEstado();
   atualizarBotoesTimer();
-
   iv = setInterval(tick, 1000);
   tick();
 }
-
 function pauseTimer() {
   clearInterval(iv);
   iv = null;
-
   const desafio = desafioAtivo();
-
   if (desafio?.prazo) {
     desafio.rem =
       restanteDoDesafio(desafio);
-
     desafio.prazo = null;
     salvarEstado();
   }
-
   running = false;
-
   atualizarBotoesTimer();
   draw();
 }
-
 function tick() {
   const desafio = desafioAtivo();
-
   if (!desafio) {
     pauseTimer();
     return;
   }
-
   const dia = diaDoTeste();
-
   if (
     dia !== null &&
     dia !== S.ativo.dia
@@ -2355,259 +2143,197 @@ function tick() {
     descartarDesafioAtivo();
     return;
   }
-
   if (!coletaLiberada()) {
     pauseTimer();
     return;
   }
-
   if (restanteDoDesafio(desafio) <= 0) {
     pauseTimer();
-
     toast(
       'Tempo finalizado. Confirme a conclusão do desafio quando estiver pronto.'
     );
-
     renderChallenge();
     return;
   }
-
   desafio.rem =
     restanteDoDesafio(desafio);
-
   draw();
   salvarEstado();
 }
-
 function descartarDesafioAtivo() {
   const desafio = desafioAtivo();
-
   pauseTimer();
-
-  if (desafio?.status === 'aceito') {
-    desafio.status = 'nao_concluido';
-    desafio.prazo = null;
-  }
-
+  // Não se modifica status local, pois o servidor mantém 'aceito'
+  // até o fim do teste; ele não contabiliza pontos sem conclusão.
+  if (desafio) desafio.prazo = null;
   S.ativo = null;
-
   salvarEstado();
   renderChallenge();
-
   if (telaAtual === 'app') {
     toast(
       'O desafio do dia anterior não foi concluído a tempo e não foi contabilizado.'
     );
   }
 }
-
-function concluirDesafio() {
+async function concluirDesafio() {
   const desafio = desafioAtivo();
-
-  if (
-    !desafio ||
-    desafio.status !== 'aceito'
-  ) {
-    return;
-  }
+  if (enviandoDesafio || !desafiosSincronizados ||
+      !desafio || desafio.status !== 'aceito') return;
 
   const dia = diaDoTeste();
-
-  if (
-    dia !== null &&
-    dia !== S.ativo.dia
-  ) {
+  if (dia !== S.ativo?.dia) {
     descartarDesafioAtivo();
     return;
   }
-
   if (!podeRegistrar()) {
-    pauseTimer();
-
-    toast(
-      coletaLiberada()
-        ? MSG_SEM_CONFIRMACAO
-        : MSG_DESAFIO_BLOQUEADO
-    );
-
-    renderChallenge();
+    toast(coletaLiberada() ? MSG_SEM_CONFIRMACAO : MSG_DESAFIO_BLOQUEADO);
     return;
   }
 
+  // Cronômetro opcional: não é necessário terminar a contagem.
   pauseTimer();
-
-  desafio.status = 'concluido';
-  desafio.rem = 0;
-  desafio.concluidoEm =
-    new Date().toISOString();
-
-  S.ativo = null;
-
-  salvarEstado();
-
-  const estatistica = estatisticas();
-
-  toast(
-    estatistica.concluidos % 3 === 0
-      ? `Desafio concluído! +${desafio.pontos} pontos e nova medalha!`
-      : `Desafio concluído! +${desafio.pontos} pontos`
-  );
-
+  enviandoDesafio = true;
   renderChallenge();
 
-  setTimeout(() => {
-    if (telaAtual === 'app') {
-      go('progress');
+  try {
+    const dados = await requisitarDesafio('concluir');
+    if (dados?.desafio?.status !== 'concluido' ||
+        !aplicarDesafioRemoto(dados.desafio)) {
+      throw new Error('O servidor não confirmou a conclusão.');
     }
-  }, 1600);
+    desafiosSincronizados = true;
+    const estatistica = estatisticas();
+    toast(estatistica.concluidos % 3 === 0
+      ? 'Desafio confirmado no Supabase! +20 pontos e nova medalha!'
+      : 'Desafio confirmado no Supabase! +20 pontos');
+    setTimeout(() => {
+      if (telaAtual === 'app') go('progress');
+    }, 1200);
+  } catch (erro) {
+    // Em caso de resposta perdida, consultar a verdade do Supabase.
+    try {
+      await carregarDesafiosServidor();
+      if (desafiosDoDia(dia)[0]?.status === 'concluido') {
+        toast('Conclusão confirmada no Supabase! +20 pontos.');
+        if (telaAtual === 'app') go('progress');
+        return;
+      }
+    } catch {
+      desafiosSincronizados = false;
+    }
+    toast(erro.message || 'Não foi possível confirmar a conclusão.');
+  } finally {
+    enviandoDesafio = false;
+    renderChallenge();
+    if (secaoAtual === 'progress') renderProgress();
+  }
 }
 
 function renderChallenge() {
-  const desafio = desafioAtivo();
-
-  const config = CH[
-    desafio
-      ? desafio.nivel
-      : nivelDesafioNovo()
-  ];
+  const dia = diaDoTeste();
+  const desafio = desafiosSincronizados ? desafioAtivo() : null;
+  const existente = desafiosSincronizados && dia >= 1 && dia <= DIAS_DO_TESTE
+    ? desafiosDoDia(dia).find(d => d.origem === 'supabase') || null
+    : null;
+  const nivel = desafio?.nivel || existente?.nivel || nivelDesafioNovo();
+  const config = CH[nivel] || CH.neutro;
 
   $('chTag').textContent = config.tag;
   $('chTitle').textContent = config.title;
   $('chText').textContent = config.text;
-  $('chPts').textContent =
-    `+${config.pts} pontos`;
-
-  $('chList').innerHTML =
-    config.list.map(
-      chave => `<li class="chip">${ACT[chave]}</li>`
-    ).join('');
+  $('chPts').textContent = '+20 pontos';
+  $('chList').innerHTML = config.list.map(
+    chave => `<li class="chip">${ACT[chave]}</li>`
+  ).join('');
 
   const liberado = coletaLiberada();
-  const dia = diaDoTeste();
-
-  const emDia =
-    liberado &&
-    dia >= 1 &&
-    dia <= DIAS_DO_TESTE;
-
-  const jaTemDesafio =
-    emDia &&
-    desafiosDoDia(dia).length > 0;
-
+  const emDia = liberado && dia >= 1 && dia <= DIAS_DO_TESTE;
   let aviso = '';
-
   if (!liberado) {
     aviso = textoBloqueio('desafios');
   } else if (!acessoConfirmado) {
     aviso = MSG_SEM_CONFIRMACAO;
-  } else if (!desafio && jaTemDesafio) {
+  } else if (!desafiosSincronizados || !checkinsSincronizados) {
+    aviso = 'Confirmando os registros no Supabase. Aguarde ou atualize a página.';
+  } else if (enviandoDesafio) {
+    aviso = 'Salvando seu desafio no Supabase...';
+  } else if (!desafio && existente?.status === 'concluido') {
+    aviso = 'Desafio concluído e confirmado no Supabase. Você recebeu 20 pontos.';
+  } else if (!desafio && existente) {
     aviso = MSG_UM_POR_DIA;
   }
 
   $('desafioBloqueioTexto').textContent = aviso;
-
-  $('desafioBloqueio').classList.toggle(
-    'hidden',
-    !aviso
-  );
-
+  $('desafioBloqueio').classList.toggle('hidden', !aviso);
   $('dia8Aviso').classList.toggle(
-    'hidden',
-    !(liberado && dia === DIAS_DO_TESTE + 1)
+    'hidden', !(liberado && dia === DIAS_DO_TESTE + 1)
   );
+  $('chNote').classList.toggle('hidden', !!desafio || !!nivelHoje());
 
-  $('chNote').classList.toggle(
-    'hidden',
-    !!desafio || !!nivelHoje()
-  );
-
-  $('accept').textContent =
-    desafio
-      ? '✓ DESAFIO ACEITO'
-      : 'ACEITAR DESAFIO';
-
-  $('accept').classList.toggle(
-    'done',
-    !!desafio
-  );
-
-  $('accept').disabled =
-    !!desafio ||
-    !emDia ||
-    !acessoConfirmado ||
-    jaTemDesafio;
-
-  $('acceptMsg').classList.toggle(
-    'hidden',
-    !desafio
-  );
-
-  $('timerBox').classList.toggle(
-    'hidden',
-    !desafio
-  );
-
-  if (desafio) {
-    draw();
-  }
-
+  $('accept').textContent = desafio
+    ? 'DESAFIO ACEITO'
+    : existente?.status === 'concluido'
+      ? 'DESAFIO CONCLUÍDO'
+      : existente ? 'DESAFIO JÁ REGISTRADO' : 'ACEITAR DESAFIO';
+  $('accept').classList.toggle('done', !!existente);
+  $('accept').disabled = !!existente || !emDia || !acessoConfirmado ||
+    !desafiosSincronizados || !checkinsSincronizados || enviandoDesafio;
+  $('acceptMsg').classList.toggle('hidden', !desafio);
+  $('timerBox').classList.toggle('hidden', !desafio);
+  if (desafio) draw();
   atualizarBotoesTimer();
 }
 
-$('accept').addEventListener('click', () => {
-  if (S.ativo) return;
-
-  if (!coletaLiberada()) {
-    toast(MSG_DESAFIO_BLOQUEADO);
+$('accept').addEventListener('click', async () => {
+  if (enviandoDesafio) return;
+  if (!coletaLiberada() || !acessoConfirmado) {
+    toast(coletaLiberada() ? MSG_SEM_CONFIRMACAO : MSG_DESAFIO_BLOQUEADO);
     return;
   }
-
-  if (!acessoConfirmado) {
-    toast(MSG_SEM_CONFIRMACAO);
+  if (!desafiosSincronizados || !checkinsSincronizados) {
+    toast('Confirme primeiro a sincronização com o Supabase.');
     return;
   }
-
   const dia = diaDoTeste();
-
   if (dia === DIAS_DO_TESTE + 1) {
     toast(MSG_DIA8);
     return;
   }
-
-  if (
-    dia < 1 ||
-    dia > DIAS_DO_TESTE
-  ) {
+  if (!Number.isInteger(dia) || dia < 1 || dia > DIAS_DO_TESTE) {
     toast(MSG_DESAFIO_BLOQUEADO);
     return;
   }
-
-  if (desafiosDoDia(dia).length) {
+  if (desafiosDoDia(dia).length > 0) {
     toast(MSG_UM_POR_DIA);
     return;
   }
 
-  const nivel = nivelDesafioNovo();
-  const registro = registroDoDia(dia);
-
-  registro.desafios.push({
-    nivel,
-    status: 'aceito',
-    pontos: CH[nivel].pts,
-    aceitoEm: new Date().toISOString(),
-    concluidoEm: null,
-    rem: CH[nivel].min * 60,
-    prazo: null
-  });
-
-  S.ativo = {
-    dia,
-    idx: registro.desafios.length - 1
-  };
-
-  salvarEstado();
+  enviandoDesafio = true;
   renderChallenge();
-  startTimer();
+  try {
+    const dados = await requisitarDesafio('aceitar');
+    if (dados?.desafio?.status !== 'aceito' ||
+        !aplicarDesafioRemoto(dados.desafio)) {
+      throw new Error('O servidor não confirmou o desafio.');
+    }
+    desafiosSincronizados = true;
+    toast('Desafio aceito e salvo! O cronômetro é opcional.');
+    // Não iniciar o cronômetro automaticamente.
+  } catch (erro) {
+    try {
+      await carregarDesafiosServidor();
+    } catch {
+      desafiosSincronizados = false;
+    }
+    if (desafiosDoDia(dia)[0]?.origem === 'supabase') {
+      toast('Seu desafio já está registrado no Supabase.');
+    } else {
+      toast(erro.message || 'Não foi possível salvar o desafio.');
+    }
+  } finally {
+    enviandoDesafio = false;
+    renderChallenge();
+  }
 });
 
 $('pause').addEventListener('click', () => {
@@ -2615,136 +2341,96 @@ $('pause').addEventListener('click', () => {
     pauseTimer();
     return;
   }
-
-  if (!coletaLiberada()) {
+  if (!coletaLiberada() || !desafiosSincronizados) {
     toast(MSG_DESAFIO_BLOQUEADO);
     return;
   }
-
   startTimer();
 });
-
 $('finish').addEventListener(
   'click',
   () => concluirDesafio()
 );
-
 /*
  * PROGRESSO
  */
-
 function estatisticas() {
   let aceitos = 0;
   let concluidos = 0;
-  let pontos = 0;
+  let checkins = 0;
   let sequencia = 0;
   let maiorSequencia = 0;
 
-  for (let n = 1; n <= DIAS_DO_TESTE; n++) {
-    const lista = desafiosDoDia(n);
-
-    const feitos = lista.filter(
-      desafio => desafio.status === 'concluido'
-    );
-
-    aceitos += lista.filter(
-      desafio => desafio.status !== 'nao_concluido'
+  for (let dia = 1; dia <= DIAS_DO_TESTE; dia++) {
+    if (checkinDoDia(dia)) checkins++;
+    const desafios = desafiosSincronizados
+      ? desafiosDoDia(dia).filter(d => d.origem === 'supabase')
+      : [];
+    const feitos = desafios.filter(d => d.status === 'concluido');
+    aceitos += desafios.filter(
+      d => d.status === 'aceito' || d.status === 'concluido'
     ).length;
-
     concluidos += feitos.length;
-
-    pontos += feitos.reduce(
-      (soma, desafio) =>
-        soma + (desafio.pontos || 0),
-      0
-    );
-
     if (feitos.length) {
       sequencia++;
-      maiorSequencia = Math.max(
-        maiorSequencia,
-        sequencia
-      );
+      maiorSequencia = Math.max(maiorSequencia, sequencia);
     } else {
       sequencia = 0;
     }
   }
-
   return {
     aceitos,
     concluidos,
-    pontos,
+    checkins,
+    pontos: checkins * 10 + concluidos * 20,
     sequencia: maiorSequencia
   };
 }
 
 function pctDia(dia) {
-  const lista = desafiosDoDia(dia);
-
-  if (
-    lista.some(
-      desafio => desafio.status === 'concluido'
-    )
-  ) {
-    return 100;
-  }
-
-  if (
-    lista.some(
-      desafio => desafio.status === 'aceito'
-    )
-  ) {
-    return 30;
-  }
-
+  const desafio = desafiosSincronizados
+    ? desafiosDoDia(dia).find(d => d.origem === 'supabase')
+    : null;
+  if (desafio?.status === 'concluido') return 100;
+  if (desafio?.status === 'aceito') return 75;
+  if (checkinDoDia(dia)) return 50;
   return 0;
 }
 
 function renderProgress() {
   const estatistica = estatisticas();
-
   $('stPts').textContent = estatistica.pontos;
   $('stAcc').textContent = estatistica.aceitos;
   $('stDone').textContent = estatistica.concluidos;
   $('stStreak').textContent = estatistica.sequencia;
-
   $('progressoVazio').classList.toggle(
     'hidden',
-    estatistica.aceitos > 0
+    estatistica.aceitos > 0 || estatistica.checkins > 0
   );
-
   const dia = diaDoTeste();
-
   const hoje =
     dia !== null && dia >= 1
       ? Math.min(dia, DIAS_DO_TESTE)
       : 0;
-
   const inicio = dataInicioTeste();
-
   $('week').innerHTML = Array.from(
     { length: DIAS_DO_TESTE },
     (_, i) => {
       const numero = i + 1;
       const percentual = pctDia(numero);
-
       const data = inicio
         ? formatarDataCurta(somarDias(inicio, i))
         : 'data a definir';
-
       const destaque =
         numero === hoje ? 'bg-brand/5' : '';
-
       const rotulo =
         numero === hoje
           ? 'font-extrabold text-brand'
           : 'font-semibold';
-
       const apagado =
         hoje > 0 && numero > hoje
           ? 'opacity-50'
           : '';
-
       return `
         <div class="flex items-center gap-3 rounded-xl px-2 py-1 ${destaque} ${apagado}">
           <span class="w-24 text-sm ${rotulo}">
@@ -2760,71 +2446,58 @@ function renderProgress() {
       `;
     }
   ).join('');
-
   const valores = Array.from(
     { length: hoje },
     (_, i) => pctDia(i + 1)
   );
-
   const media = valores.length
     ? Math.round(
         valores.reduce((a, b) => a + b, 0)
         / valores.length
       )
     : 0;
-
   $('weekPct').textContent =
     `${media}%`;
-
   const falta =
     3 - (estatistica.concluidos % 3);
-
   $('nextText').textContent =
     `Complete mais ${falta} ${
       falta === 1 ? 'desafio' : 'desafios'
     } para desbloquear uma nova medalha.`;
-
   $('nextBar').style.width = '0';
-
   let nota =
-    'Os check-ins confirmados ficam guardados no Supabase. Desafios e progresso dos desafios ainda são armazenados somente neste aparelho.';
-
+    'Check-ins confirmados: 10 pontos cada. Desafios concluídos e confirmados: 20 pontos cada. Máximo de 210 pontos em sete dias. Ambos são registrados no Supabase; o cronômetro é opcional.';
   if (!inicio) {
     nota +=
       ' A data oficial do teste ainda não foi definida.';
   }
-
   if (!acessoConfirmado) {
     nota +=
       ' Sem confirmação do servidor agora, novos registros estão bloqueados.';
   }
-
+  if (!desafiosSincronizados && coletaLiberada()) {
+    nota += ' Aguardando sincronização dos desafios: a pontuação exibida pode estar incompleta.';
+  }
   $('progressoNota').textContent = nota;
-
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       $$('#week .fill').forEach(elemento => {
         elemento.style.width =
           elemento.dataset.w + '%';
       });
-
       $('nextBar').style.width =
         ((3 - falta) / 3 * 100) + '%';
     });
   });
 }
-
 /*
  * EVENTOS FINAIS
  */
-
 $('esperaVerificar').addEventListener(
   'click',
   async () => {
     const botao = $('esperaVerificar');
-
     botao.disabled = true;
-
     try {
       await verificarAgora();
     } finally {
@@ -2832,14 +2505,11 @@ $('esperaVerificar').addEventListener(
     }
   }
 );
-
 $('bloqueioVerificar').addEventListener(
   'click',
   async () => {
     const botao = $('bloqueioVerificar');
-
     botao.disabled = true;
-
     try {
       await verificarAgora();
     } finally {
@@ -2847,35 +2517,26 @@ $('bloqueioVerificar').addEventListener(
     }
   }
 );
-
 $('nameInput').addEventListener('input', () => {
   $('nameErr').textContent = '';
 });
-
 $('nameStep').addEventListener('submit', evento => {
   evento.preventDefault();
   enviarSolicitacao();
 });
-
 function criarNotaProgresso() {
   if ($('progressoNota')) return;
-
   const nota = document.createElement('p');
-
   nota.id = 'progressoNota';
   nota.className =
     'mt-4 text-xs text-slate-500';
-
   $('progress').appendChild(nota);
 }
-
 async function iniciar() {
   construirMarca();
   criarNotaProgresso();
-
   mostrarTela('marca');
   mostrarPassoIntro('marca');
-
   try {
     await iniciarCliente();
   } catch {
@@ -2884,30 +2545,24 @@ async function iniciar() {
     );
     return;
   }
-
   let sessao = null;
-
   try {
     sessao = await sessaoLocal();
   } catch {
     sessao = null;
   }
-
   if (sessao) {
     carregarEstado(sessao.user.id);
     await verificarAgora();
     return;
   }
-
   setTimeout(() => {
     $('brandStep').classList.add('out');
   }, 2500);
-
   setTimeout(() => {
     mostrarFormulario('');
   }, 2900);
 }
-
 iniciar().catch(() => {
   mostrarFormulario(
     'Algo deu errado. Atualize a página e tente novamente.'
