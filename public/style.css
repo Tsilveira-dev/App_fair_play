@@ -71,6 +71,9 @@ body { font-family:'Nunito Sans', system-ui, sans-serif; background:var(--soft);
 .bar { height:.9rem; background:var(--line); border-radius:999px; overflow:hidden; }
 .fill { height:100%; width:0; border-radius:999px; transition:width 1s cubic-bezier(.2,.7,.2,1); }
 
+/* Desafios */
+#chTitle { overflow-wrap:anywhere; }
+
 /* Cronômetro */
 #ring { transition:stroke-dashoffset 1s linear, stroke .4s; }
 #clock { font-variant-numeric:tabular-nums; }

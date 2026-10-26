@@ -1,11 +1,17 @@
-// Netlify Function: config-publica
-// Devolve somente a URL do projeto e a chave PUBLICÁVEL do Supabase.
-// Nunca retorna SUPABASE_SECRET_KEY nem qualquer outro segredo.
+import { chavePublicavelValida } from "../lib/seguranca.mjs";
+
+/*
+ * Fair Play - Netlify Function: config-public
+ * Retorna apenas a URL e a chave publicavel.
+ * Nunca retorna a chave secreta.
+ */
+
+import { lerAmbienteSupabase } from "../lib/ambiente.mjs";
 
 const CABECALHOS = {
-  'Content-Type': 'application/json; charset=utf-8',
-  'Cache-Control': 'no-store',
-  'X-Content-Type-Options': 'nosniff'
+  "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff"
 };
 
 const resposta = (statusCode, corpo) => ({
@@ -15,31 +21,48 @@ const resposta = (statusCode, corpo) => ({
 });
 
 export const handler = async (event) => {
-  if (event.httpMethod !== 'GET') {
-    return resposta(405, { erro: 'Método não permitido.' });
+  if (event.httpMethod !== "GET") {
+    return resposta(405, {
+      erro: "Metodo nao permitido."
+    });
   }
 
-  const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
-  const chavePublicavel = (process.env.SUPABASE_PUBLISHABLE_KEY || '').trim();
-  const chaveSecreta = (process.env.SUPABASE_SECRET_KEY || '').trim();
+  // Confere se estamos usando o Supabase de testes.
+  const configuracao = lerAmbienteSupabase();
 
-  const urlValida = /^https:\/\/[^\s/]+$/.test(url);
-  const chaveValida = chavePublicavel.length > 0;
+  const chavePublicavel = (
+    process.env.SUPABASE_PUBLISHABLE_KEY || ""
+  ).trim();
 
-  // Proteção extra: recusa devolver a chave secreta por engano
-  // (por exemplo, se a variável pública tiver sido preenchida com o valor secreto).
+  const chaveSecreta = (
+    process.env.SUPABASE_SECRET_KEY || ""
+  ).trim();
+
   const chaveEhSecreta =
-    chavePublicavel.startsWith('sb_secret_') ||
-    (chaveSecreta.length > 0 && chavePublicavel === chaveSecreta);
+    !chavePublicavelValida(chavePublicavel) ||
+    (
+      chaveSecreta.length > 0 &&
+      chavePublicavel === chaveSecreta
+    );
 
-  if (!urlValida || !chaveValida || chaveEhSecreta) {
-    // Não registra valores nem detalhes no log.
-    console.error('config-publica: variáveis de ambiente ausentes ou inválidas.');
-    return resposta(500, { erro: 'Configuração indisponível.' });
+  if (
+    configuracao.erro ||
+    !chavePublicavel ||
+    chaveEhSecreta
+  ) {
+    console.error(
+      "config-public: configuracao invalida.",
+      configuracao.erro || "chave_invalida"
+    );
+
+    return resposta(500, {
+      erro: "Configuracao indisponivel."
+    });
   }
 
   return resposta(200, {
-    supabaseUrl: url,
+    ambiente: configuracao.ambiente,
+    supabaseUrl: configuracao.url,
     supabasePublishableKey: chavePublicavel
   });
 };

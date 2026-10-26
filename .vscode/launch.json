@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Fair Play: iniciar TESTE",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/dev.mjs",
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": ["--use-env-proxy", "--env-file-if-exists=.env.local"],
+      "console": "integratedTerminal",
+      "preLaunchTask": "Fair Play: conferir configuração de TESTE",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

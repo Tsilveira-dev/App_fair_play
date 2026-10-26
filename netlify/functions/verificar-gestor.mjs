@@ -1,18 +1,22 @@
+import { chavePublicavelValida, identidadeGestor } from "../lib/seguranca.mjs";
 
 /*
- * Fair Play — Netlify Function: verificar-gestor
+ * Fair Play - Netlify Function: verificar-gestor
  *
- * 1. Valida o token do usuário no Supabase Auth.
- * 2. Confirma se o usuário está cadastrado em public.gestores.
- * 3. Libera o acesso somente para gestores autorizados.
+ * 1. Valida o token no Supabase Auth.
+ * 2. Confirma o cadastro em public.gestores.
+ * 3. Autoriza somente gestores cadastrados.
  *
- * A SUPABASE_SECRET_KEY permanece exclusivamente no servidor.
+ * Ambiente validado no servidor (TESTE ou ORIGINAL).
+ * A chave secreta permanece no servidor.
  */
 
+import { lerAmbienteSupabase } from "../lib/ambiente.mjs";
+
 const CABECALHOS = {
-  'Content-Type': 'application/json; charset=utf-8',
-  'Cache-Control': 'no-store',
-  'X-Content-Type-Options': 'nosniff'
+  "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff"
 };
 
 const resposta = (statusCode, corpo) => ({
@@ -27,20 +31,20 @@ const REGEX_UUID =
 const REGEX_TOKEN = /^[A-Za-z0-9._-]+$/;
 
 /*
- * Extrai o token enviado no cabeçalho Authorization.
+ * 1. EXTRAIR TOKEN DE AUTENTICACAO
  */
 function extrairToken(headers = {}) {
   const cabecalho = (
     headers.authorization ||
     headers.Authorization ||
-    ''
+    ""
   ).trim();
 
   const partes = cabecalho.split(/\s+/);
 
   if (
     partes.length !== 2 ||
-    partes[0].toLowerCase() !== 'bearer'
+    partes[0].toLowerCase() !== "bearer"
   ) {
     return null;
   }
@@ -58,9 +62,13 @@ function extrairToken(headers = {}) {
 }
 
 /*
- * Executa requisições com limite de tempo.
+ * 2. REQUISICOES COM TEMPO LIMITE
  */
-async function fetchComTimeout(url, opcoes, ms = 5000) {
+async function fetchComTimeout(
+  url,
+  opcoes,
+  ms = 5000
+) {
   const controle = new AbortController();
 
   const timer = setTimeout(() => {
@@ -78,150 +86,210 @@ async function fetchComTimeout(url, opcoes, ms = 5000) {
 }
 
 /*
- * Função principal do Netlify.
+ * 3. PROTEGER INFORMACOES NOS LOGS
+ *
+ * Oculta formatos conhecidos de chaves,
+ * tokens e URLs em mensagens de erro.
+ */
+function mensagemSegura(erro) {
+  const mensagem = String(
+    erro?.message || "Mensagem nao informada"
+  );
+
+  return mensagem
+    .replace(
+      /sb_(?:secret|publishable)_[A-Za-z0-9_-]+/g,
+      "[CHAVE]"
+    )
+    .replace(
+      /Bearer\s+[A-Za-z0-9._-]+/gi,
+      "Bearer [TOKEN]"
+    )
+    .replace(
+      /eyJ[A-Za-z0-9._-]{20,}/g,
+      "[JWT]"
+    )
+    .replace(
+      /https?:\/\/[^\s"'`]+/g,
+      "[URL]"
+    )
+    .slice(0, 180);
+}
+
+/*
+ * 4. REGISTRAR ERRO PARA DIAGNOSTICO
+ *
+ * Nao inclui valores das variaveis de ambiente.
+ */
+function registrarErro(etapa, erro) {
+  console.error(
+    "verificar-gestor: diagnostico",
+    {
+      etapa,
+      tipo: erro?.name || "Erro",
+      mensagem: mensagemSegura(erro),
+      codigo: String(
+        erro?.code || "nao_informado"
+      ).slice(0, 60),
+      codigoDaCausa: String(
+        erro?.cause?.code || "nao_informado"
+      ).slice(0, 60)
+    }
+  );
+}
+
+/*
+ * 5. FUNCAO PRINCIPAL
  */
 export const handler = async (event) => {
 
-  // Somente requisições POST são permitidas.
-  if (event.httpMethod !== 'POST') {
+  // Aceita somente POST.
+  if (event.httpMethod !== "POST") {
     return resposta(405, {
-      erro: 'Método não permitido.'
+      erro: "Método não permitido."
     });
   }
 
   /*
-   * 1. Configuração do Supabase
+   * 6. VALIDAR AMBIENTE DE TESTE
    */
+  const ambiente = lerAmbienteSupabase();
 
-  const url = (
-    process.env.SUPABASE_URL || ''
-  )
-    .trim()
-    .replace(/\/+$/, '');
-
-  const chavePublicavel = (
-    process.env.SUPABASE_PUBLISHABLE_KEY || ''
-  ).trim();
-
-  const chaveSecreta = (
-    process.env.SUPABASE_SECRET_KEY || ''
-  ).trim();
-
-  /*
-   * Validação da URL.
-   * Substitui as expressões regulares problemáticas
-   * da versão anterior.
-   */
-  let urlValida = false;
-
-  try {
-    const endereco = new URL(url);
-
-    urlValida =
-      endereco.protocol === 'https:' &&
-      endereco.pathname === '/' &&
-      !endereco.search &&
-      !endereco.hash &&
-      !endereco.username &&
-      !endereco.password;
-
-  } catch {
-    urlValida = false;
-  }
-
-  if (
-    !urlValida ||
-    !chavePublicavel ||
-    !chaveSecreta
-  ) {
+  if (ambiente.erro) {
     console.error(
-      'verificar-gestor: variáveis de ambiente ausentes ou inválidas.'
+      "verificar-gestor: ambiente invalido.",
+      ambiente.erro
     );
 
     return resposta(500, {
-      erro: 'Configuração indisponível.'
+      erro: "Configuração indisponível."
+    });
+  }
+
+  const url = ambiente.url;
+
+  const chavePublicavel = (
+    process.env.SUPABASE_PUBLISHABLE_KEY || ""
+  ).trim();
+
+  const chaveSecreta = (
+    process.env.SUPABASE_SECRET_KEY || ""
+  ).trim();
+
+  /*
+   * Recusa configuracao ausente ou uso
+   * indevido da chave secreta no campo publico.
+   */
+  const chavesInvalidas =
+    !chavePublicavel ||
+    !chaveSecreta ||
+    !chavePublicavelValida(chavePublicavel) ||
+    chavePublicavel === chaveSecreta;
+
+  if (chavesInvalidas) {
+    console.error(
+      "verificar-gestor: configuracao das chaves invalida."
+    );
+
+    return resposta(500, {
+      erro: "Configuração indisponível."
     });
   }
 
   /*
-   * 2. Extrair token do usuário
+   * 7. EXTRAIR TOKEN
    */
-
-  const token = extrairToken(event.headers);
+  const token = extrairToken(
+    event.headers
+  );
 
   if (!token) {
     return resposta(401, {
-      erro: 'Sessão ausente. Entre novamente.'
+      erro: "Sessão ausente. Entre novamente."
     });
   }
 
   /*
-   * 3. Validar token no Supabase Auth
+   * 8. VALIDAR TOKEN NO SUPABASE AUTH
    */
-
   let usuarioId;
+  let etapaAuth = "preparar_auth";
 
   try {
+    etapaAuth = "consultar_auth";
+
     const r = await fetchComTimeout(
       `${url}/auth/v1/user`,
       {
-        method: 'GET',
+        method: "GET",
         headers: {
           apikey: chavePublicavel,
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json"
         }
       }
     );
 
-    if (r.status === 401 || r.status === 403) {
+    if (
+      r.status === 401 ||
+      r.status === 403
+    ) {
       return resposta(401, {
-        erro: 'Sessão inválida ou expirada. Entre novamente.'
+        erro: "Sessão inválida ou expirada. Entre novamente."
       });
     }
 
     if (!r.ok) {
       console.error(
-        `verificar-gestor: Supabase Auth respondeu ${r.status}.`
+        "verificar-gestor: Supabase Auth HTTP",
+        r.status
       );
 
       return resposta(500, {
-        erro: 'Não foi possível verificar o acesso.'
+        erro: "Não foi possível verificar o acesso."
       });
     }
 
+    etapaAuth = "ler_resposta_auth";
+
     const usuario = await r.json();
+
+    if (!identidadeGestor(usuario)) {
+      return resposta(403, { erro: "Acesso não autorizado." });
+    }
 
     usuarioId = usuario?.id;
 
   } catch (err) {
-    console.error(
-      `verificar-gestor: falha ao validar token (${err.name}).`
+    registrarErro(
+      etapaAuth,
+      err
     );
 
     return resposta(500, {
-      erro: 'Não foi possível verificar o acesso.'
+      erro: "Não foi possível verificar o acesso."
     });
   }
 
   /*
-   * 4. Verificar ID do usuário autenticado
+   * 9. VALIDAR ID DO USUARIO
    */
-
   if (
     !usuarioId ||
     !REGEX_UUID.test(usuarioId)
   ) {
     return resposta(401, {
-      erro: 'Sessão inválida ou expirada. Entre novamente.'
+      erro: "Sessão inválida ou expirada. Entre novamente."
     });
   }
 
   /*
-   * 5. Consultar tabela public.gestores
+   * 10. CONSULTAR PUBLIC.GESTORES
    *
-   * Somente o servidor utiliza a chave secreta.
-   * O usuário já teve sua identidade validada.
+   * Apenas o servidor utiliza a chave secreta.
+   * A consulta usa o UID validado pelo Auth.
    */
+  let etapaGestores = "preparar_consulta";
 
   try {
     const consulta = new URL(
@@ -229,66 +297,91 @@ export const handler = async (event) => {
     );
 
     consulta.searchParams.set(
-      'select',
-      'usuario_auth_id'
+      "select",
+      "usuario_auth_id"
     );
 
     consulta.searchParams.set(
-      'usuario_auth_id',
+      "usuario_auth_id",
       `eq.${usuarioId}`
     );
 
     consulta.searchParams.set(
-      'limit',
-      '1'
+      "limit",
+      "1"
     );
+
+    /*
+     * ETAPA A: Enviar consulta ao Supabase.
+     */
+    etapaGestores = "requisicao_rest";
 
     const r = await fetchComTimeout(
       consulta.toString(),
       {
-        method: 'GET',
+        method: "GET",
         headers: {
           apikey: chaveSecreta,
-          Accept: 'application/json'
+          Accept: "application/json"
         }
       }
     );
 
+    /*
+     * ETAPA B: Verificar resposta HTTP.
+     */
+    etapaGestores = "validar_status_rest";
+
     if (!r.ok) {
       console.error(
-        `verificar-gestor: consulta a gestores respondeu ${r.status}.`
+        "verificar-gestor: consulta a gestores HTTP",
+        r.status
       );
 
       return resposta(500, {
-        erro: 'Não foi possível verificar o acesso.'
+        erro: "Não foi possível verificar o acesso."
       });
     }
 
+    /*
+     * ETAPA C: Ler a resposta JSON.
+     */
+    etapaGestores = "ler_json_rest";
+
     const linhas = await r.json();
+
+    /*
+     * ETAPA D: Confirmar cadastro do gestor.
+     */
+    etapaGestores = "validar_cadastro";
 
     if (
       !Array.isArray(linhas) ||
       linhas.length !== 1
     ) {
       return resposta(403, {
-        erro: 'Acesso não autorizado.'
+        erro: "Acesso não autorizado."
       });
     }
 
   } catch (err) {
-    console.error(
-      `verificar-gestor: falha ao consultar gestores (${err.name}).`
+    /*
+     * Diagnostico detalhado do erro.
+     * Nao devolve dados sensiveis ao navegador.
+     */
+    registrarErro(
+      etapaGestores,
+      err
     );
 
     return resposta(500, {
-      erro: 'Não foi possível verificar o acesso.'
+      erro: "Não foi possível verificar o acesso."
     });
   }
 
   /*
-   * 6. Gestor autorizado
+   * 11. GESTOR AUTORIZADO
    */
-
   return resposta(200, {
     autorizado: true
   });

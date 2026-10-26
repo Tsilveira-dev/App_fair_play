@@ -1,15 +1,15 @@
 // Fair Play — Painel do gestor (admin.js)
 // Login e sessão: Supabase Auth (URL e chave publicável vêm de config-public).
-// Dados: somente pelas Netlify Functions, que validam o token do gestor no servidor.
+// Dados: somente pelas funções no servidor, que validam o token do gestor no servidor.
 // Este arquivo não acessa tabelas do Supabase diretamente.
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 
 const FUNCOES = {
-  config: '/.netlify/functions/config-public',
-  verificar: '/.netlify/functions/verificar-gestor',
-  listar: '/.netlify/functions/listar-participantes',
-  salvar: '/.netlify/functions/salvar-participante',
-  acessos: '/.netlify/functions/gerenciar-acesso'
+  config: '/api/config-public',
+  verificar: '/api/verificar-gestor',
+  listar: '/api/listar-participantes',
+  salvar: '/api/salvar-participante',
+  acessos: '/api/gerenciar-acesso'
 };
 
 const FUSO = 'America/Fortaleza';
@@ -96,7 +96,7 @@ async function carregarConfiguracao() {
 async function iniciarSupabase() {
   const config = await carregarConfiguracao();
   supabase = createClient(config.supabaseUrl, config.supabasePublishableKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    auth: { storageKey: `fairplay-gestor:${new URL(config.supabaseUrl).hostname}`, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   });
 }
 
@@ -226,7 +226,7 @@ async function executar(botao, textoOcupado, fn) {
   }
 }
 
-/* ---------- Comunicação com as Netlify Functions ---------- */
+/* ---------- Comunicação com as funções no servidor ---------- */
 
 async function obterToken() {
   if (!supabase) throw new ErroSessao('Configuração do sistema ausente. Atualize a página.');
