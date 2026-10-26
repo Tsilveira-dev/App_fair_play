@@ -1,3 +1,4 @@
+import { chavePublicavelValida, identidadeGestor } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play - Netlify Function: listar-participantes
@@ -8,7 +9,7 @@
  * 4. Lista apenas os participantes cadastrados.
  *
  * A chave secreta permanece no servidor.
- * Somente o Supabase de TESTES é permitido.
+ * O projeto Supabase é validado por ambiente.
  */
 
 import { lerAmbienteSupabase } from "../lib/ambiente.mjs";
@@ -55,7 +56,7 @@ function lerConfiguracao() {
   if (
     !chavePublicavel ||
     !chaveSecreta ||
-    chavePublicavel.startsWith("sb_secret_") ||
+    !chavePublicavelValida(chavePublicavel) ||
     chavePublicavel === chaveSecreta
   ) {
     return null;
@@ -156,7 +157,7 @@ async function obterUsuarioId(config, token) {
 
   const id = usuario && usuario.id;
 
-  return REGEX_UUID.test(id || "")
+  return identidadeGestor(usuario) && REGEX_UUID.test(id || "")
     ? id
     : null;
 }

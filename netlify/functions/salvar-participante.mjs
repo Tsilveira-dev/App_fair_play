@@ -1,3 +1,4 @@
+import { chavePublicavelValida, identidadeGestor } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play — salvar-participante.mjs
@@ -74,7 +75,7 @@ function lerConfiguracao() {
   if (
     !chavePublicavel ||
     !chaveSecreta ||
-    chavePublicavel.startsWith('sb_secret_') ||
+    !chavePublicavelValida(chavePublicavel) ||
     chavePublicavel === chaveSecreta
   ) {
     return null;
@@ -175,7 +176,7 @@ async function obterUsuarioId(config, token) {
   const usuario = await r.json();
   const id = usuario && usuario.id;
 
-  return REGEX_UUID.test(id || '')
+  return identidadeGestor(usuario) && REGEX_UUID.test(id || '')
     ? id
     : null;
 }

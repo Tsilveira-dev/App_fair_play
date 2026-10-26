@@ -1,3 +1,4 @@
+import { chavePublicavelValida, identidadeGestor } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play - Netlify Function: verificar-gestor
@@ -6,7 +7,7 @@
  * 2. Confirma o cadastro em public.gestores.
  * 3. Autoriza somente gestores cadastrados.
  *
- * Ambiente exclusivo de TESTES.
+ * Ambiente validado no servidor (TESTE ou ORIGINAL).
  * A chave secreta permanece no servidor.
  */
 
@@ -182,7 +183,7 @@ export const handler = async (event) => {
   const chavesInvalidas =
     !chavePublicavel ||
     !chaveSecreta ||
-    chavePublicavel.startsWith("sb_secret_") ||
+    !chavePublicavelValida(chavePublicavel) ||
     chavePublicavel === chaveSecreta;
 
   if (chavesInvalidas) {
@@ -252,6 +253,10 @@ export const handler = async (event) => {
     etapaAuth = "ler_resposta_auth";
 
     const usuario = await r.json();
+
+    if (!identidadeGestor(usuario)) {
+      return resposta(403, { erro: "Acesso não autorizado." });
+    }
 
     usuarioId = usuario?.id;
 

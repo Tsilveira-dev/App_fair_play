@@ -1,3 +1,4 @@
+import { chavePublicavelValida } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play - Netlify Function: consultar-acesso
@@ -85,7 +86,7 @@ class ErroBanco extends Error {
 /*
  * 1. CONFIGURAÇÃO SEGURA DO SUPABASE
  *
- * Somente o Supabase de TESTES é permitido.
+ * O projeto Supabase é validado por ambiente.
  */
 function lerConfiguracao() {
   const ambiente = lerAmbienteSupabase();
@@ -110,7 +111,7 @@ function lerConfiguracao() {
   if (
     !chavePublicavel ||
     !chaveSecreta ||
-    chavePublicavel.startsWith("sb_secret_") ||
+    !chavePublicavelValida(chavePublicavel) ||
     chavePublicavel === chaveSecreta
   ) {
     return null;

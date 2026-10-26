@@ -2,3 +2,10 @@
 [build]
   publish = "public"
   functions = "netlify/functions"
+
+# Compatibilidade durante a transição: o frontend usa /api também na Netlify.
+[[redirects]]
+  from = "/api/:function"
+  to = "/.netlify/functions/:function"
+  status = 200
+  force = true

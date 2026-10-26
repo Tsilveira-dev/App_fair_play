@@ -1,3 +1,4 @@
+import { chavePublicavelValida } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play - Netlify Function: config-public
@@ -38,7 +39,7 @@ export const handler = async (event) => {
   ).trim();
 
   const chaveEhSecreta =
-    chavePublicavel.startsWith("sb_secret_") ||
+    !chavePublicavelValida(chavePublicavel) ||
     (
       chaveSecreta.length > 0 &&
       chavePublicavel === chaveSecreta

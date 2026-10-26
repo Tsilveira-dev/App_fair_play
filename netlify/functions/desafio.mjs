@@ -1,7 +1,8 @@
+import { chavePublicavelValida, dataValida } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play — desafio.mjs
- * Exclusivo do ambiente de TESTE.
+ * Ambiente validado no servidor (TESTE ou ORIGINAL).
  *
  * GET: listar desafios registrados.
  * POST { acao: "aceitar" }: aceitar o desafio do dia.
@@ -45,7 +46,7 @@ function lerConfig() {
     ambiente.erro ||
     !publica ||
     !secreta ||
-    publica.startsWith("sb_secret_") ||
+    !chavePublicavelValida(publica) ||
     publica === secreta
   ) {
     return null;
@@ -218,6 +219,7 @@ async function contextoParticipante(cfg, usuarioId) {
   if (
     !sessao ||
     !sessao.expira_em ||
+    !Number.isFinite(Date.parse(sessao.expira_em)) ||
     Date.parse(sessao.expira_em) <= Date.now()
   ) {
     return null;
@@ -255,8 +257,7 @@ async function contextoParticipante(cfg, usuarioId) {
   const inicio = configuracoes[0].data_inicio;
 
   if (
-    typeof inicio !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(inicio)
+    !dataValida(inicio)
   ) {
     return null;
   }
@@ -415,6 +416,8 @@ async function aceitar(cfg, contexto) {
     throw erro;
   }
 
+  if (!registros[0]) throw new Error("Inserção sem confirmação");
+
   return responder(201, {
     desafio: registros[0],
     pontos: 0
@@ -493,6 +496,10 @@ export const handler = async event => {
       return responder(403, {
         erro: "Participação não autorizada."
       });
+    }
+
+    if (contexto.dia > 8) {
+      return responder(403, { erro: "Fora do período permitido." });
     }
 
     if (event.httpMethod === "GET") {

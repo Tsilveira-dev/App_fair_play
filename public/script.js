@@ -5,21 +5,21 @@
  * Catálogo de perguntas: rascunho 2026.1; validar antes da coleta.
  *
  * Auth: Supabase.
- * Autorização: Netlify Functions.
+ * Autorização: funções no servidor.
  * Check-ins: Supabase.
  * Desafios: persistência no Supabase, com confirmação pelo servidor.
  */
 const FUNCOES = {
-  config: '/.netlify/functions/config-public',
-  solicitar: '/.netlify/functions/solicitar-acesso',
-  consultar: '/.netlify/functions/consultar-acesso',
-  checkin: '/.netlify/functions/checkin',
-  desafio: '/.netlify/functions/desafio'
+  config: '/api/config-public',
+  solicitar: '/api/solicitar-acesso',
+  consultar: '/api/consultar-acesso',
+  checkin: '/api/checkin',
+  desafio: '/api/desafio'
 };
 const SUPABASE_ESM =
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 const CHAVE_SESSAO = 'fairplay-estudante-auth';
-const PREFIXO_ESTADO = 'fairplay-v5:';
+let prefixoEstado = 'fairplay-v5:';
 const INTERVALO_VERIFICACAO_MS = 30000;
 const FUSO = 'America/Fortaleza';
 const DIAS_DO_TESTE = 7;
@@ -459,8 +459,7 @@ const ACT = {
 };
 /*
  * Desafios antigos preservados.
- * Ainda falta a integração definitiva
- * dos 21 desafios e da pontuação planejada.
+ * Mantidos como fallback; o catálogo diário abaixo define a atividade exibida.
  */
 const CH = {
   baixo: {
@@ -675,7 +674,7 @@ function salvarEstado() {
   if (!uidAtual) return;
   try {
     localStorage.setItem(
-      PREFIXO_ESTADO + uidAtual,
+      prefixoEstado + uidAtual,
       JSON.stringify(S)
     );
   } catch {
@@ -699,7 +698,7 @@ function carregarEstado(uid) {
   let salvo = null;
   try {
     salvo = JSON.parse(
-      localStorage.getItem(PREFIXO_ESTADO + uid) || 'null'
+      localStorage.getItem(prefixoEstado + uid) || 'null'
     );
   } catch {
     salvo = null;
@@ -958,6 +957,8 @@ async function iniciarCliente() {
   ) {
     throw new Error('Configuração inválida.');
   }
+  const projeto = new URL(config.supabaseUrl).hostname;
+  prefixoEstado = `fairplay-v5:${projeto}:`;
   const { createClient } = await import(SUPABASE_ESM);
   supa = createClient(
     config.supabaseUrl,
@@ -967,7 +968,7 @@ async function iniciarCliente() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
-        storageKey: CHAVE_SESSAO
+        storageKey: `${CHAVE_SESSAO}:${projeto}`
       }
     }
   );
@@ -2410,7 +2411,7 @@ function estatisticas() {
   let maiorSequencia = 0;
 
   for (let dia = 1; dia <= DIAS_DO_TESTE; dia++) {
-    if (checkinDoDia(dia)) checkins++;
+    if (checkinsSincronizados && checkinDoDia(dia)) checkins++;
     const desafios = desafiosSincronizados
       ? desafiosDoDia(dia).filter(d => d.origem === 'supabase')
       : [];

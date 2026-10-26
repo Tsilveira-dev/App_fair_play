@@ -1,3 +1,4 @@
+import { chavePublicavelValida, identidadeGestor } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play - Netlify Function: gerenciar-acesso
@@ -24,7 +25,7 @@
  * - O PATCH exige o status anterior para evitar conflitos.
  * - Respostas não incluem UID dos estudantes nem chaves.
  * - A chave secreta permanece no servidor.
- * - Somente o Supabase de TESTES é permitido.
+ * - O projeto Supabase é validado por ambiente.
  */
 
 import { lerAmbienteSupabase } from "../lib/ambiente.mjs";
@@ -129,7 +130,7 @@ function lerConfiguracao() {
   if (
     !chavePublicavel ||
     !chaveSecreta ||
-    chavePublicavel.startsWith('sb_secret_') ||
+    !chavePublicavelValida(chavePublicavel) ||
     chavePublicavel === chaveSecreta
   ) {
     return null;
@@ -236,16 +237,6 @@ async function obterUsuario(config, token) {
 /*
  * 5. BLOQUEAR IDENTIDADES ANÔNIMAS
  */
-function ehIdentidadeAnonima(usuario) {
-  return (
-    usuario.is_anonymous === true ||
-    (
-      usuario.app_metadata &&
-      usuario.app_metadata.provider === 'anonymous'
-    )
-  );
-}
-
 /*
  * 6. ACESSO AO BANCO
  *
@@ -1106,7 +1097,7 @@ export const handler = async (event) => {
 
     // 2. Bloquear identidades anônimas.
     if (
-      ehIdentidadeAnonima(usuario)
+      !identidadeGestor(usuario)
     ) {
       return resposta(
         403,

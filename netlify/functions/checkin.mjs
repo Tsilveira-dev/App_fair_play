@@ -1,7 +1,8 @@
+import { chavePublicavelValida, dataValida } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play — Netlify Function: checkin
- * Ambiente exclusivo de TESTE.
+ * Ambiente validado no servidor (TESTE ou ORIGINAL).
  *
  * GET: lê os check-ins do participante autenticado.
  * POST: grava um check-in com pontuação calculada
@@ -119,7 +120,7 @@ function configuracao() {
     ambiente.erro ||
     !publica ||
     !secreta ||
-    publica.startsWith("sb_secret_") ||
+    !chavePublicavelValida(publica) ||
     publica === secreta
   ) {
     return null;
@@ -492,8 +493,7 @@ export const handler = async event => {
       periodos[0].data_inicio;
 
     if (
-      typeof inicio !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(inicio)
+      !dataValida(inicio)
     ) {
       return resposta(500, {
         erro: "Período inválido."
@@ -507,6 +507,10 @@ export const handler = async event => {
      * GET: buscar check-ins do próprio
      * participante, no máximo sete.
      */
+    if (diaAtual > 8) {
+      return resposta(403, { erro: "Fora do período permitido." });
+    }
+
     if (event.httpMethod === "GET") {
       const registros = await tabela(
         cfg,

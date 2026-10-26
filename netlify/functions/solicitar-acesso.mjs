@@ -1,14 +1,15 @@
+import { chavePublicavelValida } from "../lib/seguranca.mjs";
 
 /*
  * Fair Play - Netlify Function: solicitar-acesso
  *
- * Ambiente exclusivo de TESTE.
+ * Ambiente validado no servidor (TESTE ou ORIGINAL).
  *
  * Recebe solicitações dos estudantes.
  * Não aprova acessos automaticamente.
  *
  * Proteções:
- * - Apenas Supabase de TESTE.
+ * - Supabase validado por ambiente.
  * - Autenticação anônima obrigatória.
  * - Intervalo de 30 segundos por usuário.
  * - Máximo de 10 solicitações por usuário/hora.
@@ -17,7 +18,6 @@
  * A chave secreta permanece no servidor.
  */
 
-import { randomUUID } from "node:crypto";
 import { lerAmbienteSupabase } from "../lib/ambiente.mjs";
 
 const JSON_HEADERS = {
@@ -49,12 +49,6 @@ const GENERIC = {
 const UUID =
   /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 
-const JANELA_MS = 60 * 60 * 1000;
-const INTERVALO_MS = 30 * 1000;
-
-const LIMITE_POR_USUARIO = 10;
-const LIMITE_GERAL = 300;
-
 /*
  * 1. CONFIGURAÇÃO SEGURA
  *
@@ -81,7 +75,7 @@ function config() {
   if (
     !publicKey ||
     !secretKey ||
-    publicKey.startsWith("sb_secret_") ||
+    !chavePublicavelValida(publicKey) ||
     publicKey === secretKey
   ) {
     throw new Error(
@@ -359,159 +353,22 @@ function parseInput(event) {
  * O registro acontece antes da
  * solicitação ser processada.
  */
-async function registrarTentativaSePermitida(
-  cfg,
-  userId,
-  agora
-) {
-  const desde = new Date(
-    agora.getTime() - JANELA_MS
-  ).toISOString();
-
-  /*
-   * 7.1. Consultar tentativas do usuário.
-   */
-  const porUsuario = await db(
-    cfg,
-    "solicitacoes_tentativas",
-    "GET",
-    {
-      select: "criado_em",
-      usuario_auth_id: `eq.${userId}`,
-      criado_em: `gte.${desde}`,
-      order: "criado_em.desc",
-      limit: String(
-        LIMITE_POR_USUARIO
-      )
-    }
-  );
-
-  if (!Array.isArray(porUsuario)) {
-    throw new Error(
-      "Resposta inválida de tentativas"
-    );
+async function registrarTentativaSePermitida(cfg, userId) {
+  const r = await request(`${cfg.url}/rest/v1/rpc/registrar_tentativa_acesso`, {
+    method: "POST",
+    headers: {
+      apikey: cfg.secretKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ p_usuario: userId })
+  });
+  if (!r.ok) throw new Error(`Limite de acesso HTTP ${r.status}`);
+  const limite = await r.json();
+  if (typeof limite?.bloqueado !== "boolean" ||
+      (limite.bloqueado && (!Number.isInteger(limite.espera) || limite.espera < 1))) {
+    throw new Error("Resposta inválida do limite de acesso");
   }
-
-  /*
-   * 7.2. Aplicar intervalo de 30 segundos.
-   */
-  if (porUsuario.length > 0) {
-    const ultima = Date.parse(
-      porUsuario[0].criado_em
-    );
-
-    if (!Number.isFinite(ultima)) {
-      throw new Error(
-        "Data de tentativa inválida"
-      );
-    }
-
-    const decorrido =
-      agora.getTime() - ultima;
-
-    if (decorrido < INTERVALO_MS) {
-      const espera = Math.max(
-        1,
-        Math.ceil(
-          (INTERVALO_MS - decorrido) / 1000
-        )
-      );
-
-      return {
-        bloqueado: true,
-        espera,
-        motivo: "intervalo"
-      };
-    }
-  }
-
-  /*
-   * 7.3. Aplicar limite de 10 por hora.
-   */
-  if (
-    porUsuario.length >=
-    LIMITE_POR_USUARIO
-  ) {
-    const maisAntiga = Date.parse(
-      porUsuario[
-        porUsuario.length - 1
-      ].criado_em
-    );
-
-    if (!Number.isFinite(maisAntiga)) {
-      throw new Error(
-        "Data de tentativa inválida"
-      );
-    }
-
-    const espera = Math.max(
-      1,
-      Math.ceil(
-        (
-          JANELA_MS -
-          (agora.getTime() - maisAntiga)
-        ) / 1000
-      )
-    );
-
-    return {
-      bloqueado: true,
-      espera,
-      motivo: "limite"
-    };
-  }
-
-  /*
-   * 7.4. Consultar tentativas gerais.
-   */
-  const gerais = await db(
-    cfg,
-    "solicitacoes_tentativas",
-    "GET",
-    {
-      select: "id",
-      criado_em: `gte.${desde}`,
-      limit: String(LIMITE_GERAL)
-    }
-  );
-
-  if (!Array.isArray(gerais)) {
-    throw new Error(
-      "Resposta inválida de tentativas globais"
-    );
-  }
-
-  if (
-    gerais.length >= LIMITE_GERAL
-  ) {
-    return {
-      bloqueado: true,
-      espera: 3600,
-      motivo: "limite"
-    };
-  }
-
-  /*
-   * 7.5. Registrar uma nova tentativa.
-   *
-   * Usa o UID autenticado, nunca
-   * um ID enviado pelo navegador.
-   */
-  await db(
-    cfg,
-    "solicitacoes_tentativas",
-    "POST",
-    {},
-    {
-      id: randomUUID(),
-      usuario_auth_id: userId,
-      criado_em: agora.toISOString()
-    }
-  );
-
-  return {
-    bloqueado: false
-  };
+  return limite;
 }
 
 /*
@@ -751,8 +608,7 @@ export const handler = async (event) => {
     const limite =
       await registrarTentativaSePermitida(
         cfg,
-        user.id,
-        new Date()
+        user.id
       );
 
     if (limite.bloqueado) {

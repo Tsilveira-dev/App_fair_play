@@ -23,7 +23,10 @@ export function lerAmbienteSupabase(env = process.env) {
   const ambiente = String(env.AMBIENTE || '').trim().toLowerCase();
   const url = limparUrl(env.SUPABASE_URL);
 
+  const branch = String(env.VERCEL_GIT_COMMIT_REF || '');
+
   if (ambiente === 'teste') {
+    if (branch && branch !== 'teste-supabase') return { erro: 'branch_teste_incorreta' };
     if (url !== URL_SUPABASE_TESTE) {
       return { erro: 'supabase_teste_incorreto' };
     }
@@ -31,6 +34,8 @@ export function lerAmbienteSupabase(env = process.env) {
   }
 
   if (ambiente === 'original') {
+    if ((env.VERCEL_ENV && env.VERCEL_ENV !== 'production') ||
+        (branch && branch !== 'main')) return { erro: 'original_fora_de_producao' };
     const esperada = limparUrl(env.SUPABASE_ORIGINAL_URL_ESPERADA);
 
     // O domínio original deve ser explícito e diferente do projeto de teste.
