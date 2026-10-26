@@ -1,5 +1,8 @@
 # Inventário e validação
 
+> **Atualização vigente — 26/10/2026:** PR #1 integrado à main em `9ef6f8d`, ORIGINAL publicado, 002/002b/patch/003 aprovados e login do gestor confirmado pelo responsável. As etapas anteriores abaixo são histórico, não tarefas a repetir. Estado atual em [Estado dos bancos](ESTADO_BANCOS.md), [Verificação ORIGINAL](VERIFICACAO_ORIGINAL.md) e [Checklist de coleta](OPERACAO_COLETA.md). O período ainda não foi configurado; a pesquisa não foi iniciada/concluída pelo Codex.
+
+
 Base inspecionada: `teste-supabase`, commit `4e9ded1b460e05e393a8094e3517abc7187dd3b5`. A branch já tinha pasta `public`, questionário diário, check-ins, desafios e separação por ambiente. A lógica foi aproveitada e as entradas Vercel compartilham os mesmos handlers da Netlify.
 
 ## Funcionalidades e contratos

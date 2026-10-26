@@ -1,5 +1,8 @@
 # Migração incremental sem transportar dados
 
+> **Estado atual — 26/10/2026:** ORIGINAL e TESTE já tiveram suas proteções validadas administrativamente; ORIGINAL com 002, 002b, correção de `rls_auto_enable()` e auditoria 003 aprovadas, publicado e com gestor autenticado. Não executar migrações/reversões deste diretório como tarefa pendente. O conteúdo de instalação abaixo é referência histórica; para iniciar a pesquisa, seguir [operação da coleta](../docs/OPERACAO_COLETA.md) e [estado dos bancos](../docs/ESTADO_BANCOS.md).
+
+
 TESTE: `jzxltkjxdefuptutpkfx`. ORIGINAL: `swbwbkslcotoecjlbqxe`.
 
 O responsável informou que o TESTE já tem tabelas, RLS, registros fictícios e UNIQUEs, incluindo `sessoes_uma_ativa_por_participante` para **pendente e aprovada**. A atualização recebida confirma que a 002 já foi aplicada com sucesso, incluindo RPC, três triggers e visão, preservando os registros. Não reaplicar 002 no TESTE e não recriar o projeto. Essas características foram reproduzidas em PostgreSQL PGlite local; o esquema hospedado não pôde ser inspecionado nesta sessão, que não dispõe de acesso administrativo ao Supabase.
