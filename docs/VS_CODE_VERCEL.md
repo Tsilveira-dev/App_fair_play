@@ -1,5 +1,8 @@
 # Abrir no VS Code e publicar o TESTE
 
+> O ORIGINAL já está publicado em https://fairplay-original.vercel.app, com PR #1 integrado à main. Este roteiro trata de desenvolvimento/TESTE e é referência; não recriar serviços existentes ou copiar credenciais ORIGINAL. Estado vigente em [ORIGINAL](ORIGINAL.md) e [Operação da coleta](OPERACAO_COLETA.md).
+
+
 Os arquivos e configurações estão na branch `teste-supabase`, no PR #1. Não é necessário integrar o PR à `main` para publicar o TESTE.
 
 ## No VS Code

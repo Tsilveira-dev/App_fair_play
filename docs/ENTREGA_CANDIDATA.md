@@ -1,5 +1,8 @@
 # Candidata do Fair Play para revisão
 
+> **Atualização vigente — 26/10/2026:** PR #1 integrado à main em `9ef6f8d`, ORIGINAL publicado, 002/002b/patch/003 aprovados e login do gestor confirmado pelo responsável. As etapas anteriores abaixo são histórico, não tarefas a repetir. Estado atual em [Estado dos bancos](ESTADO_BANCOS.md), [Verificação ORIGINAL](VERIFICACAO_ORIGINAL.md) e [Checklist de coleta](OPERACAO_COLETA.md). O período ainda não foi configurado; a pesquisa não foi iniciada/concluída pelo Codex.
+
+
 Código na branch `teste-supabase`; PR #1 permanece em rascunho. Não representa liberação para pesquisa de campo.
 
 ## Evidências desta etapa

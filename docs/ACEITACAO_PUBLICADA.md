@@ -1,5 +1,8 @@
 # Aceitação no aplicativo publicado de TESTE
 
+> **Atualização vigente — 26/10/2026:** PR #1 integrado à main em `9ef6f8d`, ORIGINAL publicado, 002/002b/patch/003 aprovados e login do gestor confirmado pelo responsável. As etapas anteriores abaixo são histórico, não tarefas a repetir. Estado atual em [Estado dos bancos](ESTADO_BANCOS.md), [Verificação ORIGINAL](VERIFICACAO_ORIGINAL.md) e [Checklist de coleta](OPERACAO_COLETA.md). O período ainda não foi configurado; a pesquisa não foi iniciada/concluída pelo Codex.
+
+
 Alvo: `https://fairplay-teste.vercel.app`, branch `teste-supabase`. A execução inicial abaixo utilizou o código `252061e`; a revisão de mensagens está descrita ao final. O PR #1 permanece em rascunho.
 
 ## Estado administrativo recebido

@@ -1,6 +1,7 @@
 # Fair Play
 
-- Trabalhe em `teste-supabase` primeiro. Não integre à `main`, altere o banco ORIGINAL ou publique o ORIGINAL sem aprovação explícita do responsável.
+- PR #1 já integrado à `main` (9ef6f8d) e ORIGINAL publicado. Para novas alterações, crie branch a partir da `origin/main` atualizada e novo PR; nunca faça commits diretos na `main`. Preserve `teste-supabase` como TESTE separado.
+- Não reaplique migrações já validadas, recrie projetos ou altere dados, calendário, coleta e acessos do ORIGINAL sem autorização aplicável. Verificações sem sessão não devem criar contas/solicitações fictícias.
 - Cada tarefa de nuvem já tem isolamento; use o checkout existente. Não crie worktrees sem solicitação explícita.
 - Preserve perguntas, alternativas e textos dos desafios. O catálogo recebido está marcado como rascunho/proposta e depende da validação acadêmica do responsável antes da coleta real.
 - TESTE e ORIGINAL usam projetos Supabase e Vercel separados. Nunca copie registros, usuários ou credenciais entre eles.
