@@ -14,6 +14,7 @@
  * Nunca incluir chaves secretas aqui.
  */
 const URL_SUPABASE_TESTE = 'https://jzxltkjxdefuptutpkfx.supabase.co';
+const URL_SUPABASE_ORIGINAL = 'https://swbwbkslcotoecjlbqxe.supabase.co';
 
 function limparUrl(valor) {
   return String(valor || '').trim().replace(/\/+$/, '');
@@ -42,7 +43,7 @@ export function lerAmbienteSupabase(env = process.env) {
 
     // O domínio original deve ser explícito e diferente do projeto de teste.
     const ehSupabase = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(url);
-    if (!esperada || !ehSupabase || url !== esperada || url === URL_SUPABASE_TESTE) {
+    if (!esperada || !ehSupabase || url !== esperada || url !== URL_SUPABASE_ORIGINAL) {
       return { erro: 'supabase_original_incorreto' };
     }
     return { ambiente: 'original', url };

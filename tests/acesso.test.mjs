@@ -10,8 +10,9 @@ test('ambientes: TESTE fixo, ORIGINAL explícito e diferente; preview nunca usa 
   assert.equal(lerAmbienteSupabase({AMBIENTE:'teste',SUPABASE_URL:URL_TESTE}).ambiente,'teste');
   assert(lerAmbienteSupabase({AMBIENTE:'teste',SUPABASE_URL:'https://outro.supabase.co'}).erro);
   assert(lerAmbienteSupabase({AMBIENTE:'original',SUPABASE_URL:URL_TESTE,SUPABASE_ORIGINAL_URL_ESPERADA:URL_TESTE}).erro);
-  const env={AMBIENTE:'original',SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co',SUPABASE_ORIGINAL_URL_ESPERADA:'https://abcdefghijklmnopqrst.supabase.co'};
+  const env={AMBIENTE:'original',SUPABASE_URL:'https://swbwbkslcotoecjlbqxe.supabase.co',SUPABASE_ORIGINAL_URL_ESPERADA:'https://swbwbkslcotoecjlbqxe.supabase.co'};
   assert.equal(lerAmbienteSupabase(env).ambiente,'original');
+  assert(lerAmbienteSupabase({...env,SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co',SUPABASE_ORIGINAL_URL_ESPERADA:'https://abcdefghijklmnopqrst.supabase.co'}).erro);
   assert(lerAmbienteSupabase({...env,VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'teste-supabase'}).erro);
   assert(lerAmbienteSupabase({...env,VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'teste-supabase'}).erro);
   assert.equal(lerAmbienteSupabase({...env,VERCEL_ENV:'production',VERCEL_GIT_COMMIT_REF:'main'}).ambiente,'original');
@@ -113,8 +114,8 @@ test('gestor: revoga sem excluir histórico e lista por filtro',async t=>{
 
 
 test('Netlify: previews e branch deploys nunca podem usar ORIGINAL',()=>{
-  const original={AMBIENTE:'original',SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co',
-    SUPABASE_ORIGINAL_URL_ESPERADA:'https://abcdefghijklmnopqrst.supabase.co',NETLIFY:'true'};
+  const original={AMBIENTE:'original',SUPABASE_URL:'https://swbwbkslcotoecjlbqxe.supabase.co',
+    SUPABASE_ORIGINAL_URL_ESPERADA:'https://swbwbkslcotoecjlbqxe.supabase.co',NETLIFY:'true'};
   assert(lerAmbienteSupabase({...original,CONTEXT:'deploy-preview',HEAD:'teste-supabase',BRANCH:'main'}).erro);
   assert(lerAmbienteSupabase({...original,CONTEXT:'branch-deploy',HEAD:'teste-supabase'}).erro);
   assert(lerAmbienteSupabase({...original,CONTEXT:'production',HEAD:'teste-supabase'}).erro);

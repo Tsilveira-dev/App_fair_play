@@ -2,11 +2,11 @@
 
 Para executar a preparação no editor e configurar o painel, siga [VS Code e Vercel](VS_CODE_VERCEL.md).
 
-O código está preparado para implantação. Nenhum projeto Vercel foi conectado e nenhum banco externo foi alterado por esta entrega. A integração Netlify preexistente cria previews automaticamente ao abrir/atualizar o PR, inclusive no projeto fairplay-app; a trava CONTEXT/HEAD bloqueia ORIGINAL nesses previews. A produção em main não foi alterada.
+O projeto Vercel de TESTE `fairplay-teste` já está conectado e tem deploy bem-sucedido registrado no GitHub. Nesta etapa houve apenas a criação de uma identidade Auth fictícia no TESTE e verificações de acesso, sem migração SQL externa; veja o [estado da candidata](ENTREGA_CANDIDATA.md). A integração Netlify preexistente cria previews automaticamente ao abrir/atualizar o PR, inclusive no projeto fairplay-app; a trava CONTEXT/HEAD bloqueia ORIGINAL nesses previews. A produção em main não foi alterada.
 
 ## TESTE primeiro
 
-1. Após autorizar a conexão da Vercel ao GitHub, configure um projeto separado para TESTE. Antes de disparar um deploy, confirme a branch `teste-supabase`, o ambiente Supabase e as variáveis abaixo. Não habilite publicação automática do ORIGINAL.
+1. Utilize o projeto Vercel de TESTE já existente, `fairplay-teste`, separado do ORIGINAL. Antes de disparar um deploy, confirme a branch `teste-supabase`, o ambiente Supabase e as variáveis abaixo. Não habilite publicação automática do ORIGINAL.
 2. Use Framework **Other**, Root Directory **raiz do repositório**, Node **24.x**, Build Command `npm run build` e Output Directory `public`. `vercel.json` já registra build, saída, funções e compatibilidade das rotas.
 3. Restrinja a Production Branch deste projeto de TESTE a `teste-supabase`. Previews também devem usar apenas as credenciais de TESTE. Um deploy de outro nome de branch falha fechado com essa configuração.
 4. Cadastre as variáveis no projeto de TESTE, nos escopos necessários, sem copiar valores do ORIGINAL:
@@ -32,7 +32,7 @@ O frontend usa jsDelivr para Supabase JS 2.45.4, Tailwind CDN e Google Fonts, pr
 - Revisar o PR e autorizar a integração à `main`; não promover automaticamente as credenciais do TESTE.
 - Confirmar a validação acadêmica dos textos: o código recebido ainda identifica questionário e desafios como rascunho/proposta. Eles foram preservados integralmente.
 - Fazer backup do ORIGINAL e comparar o esquema existente com a baseline. Aprovar separadamente a execução das migrações; nunca importar registros, usuários, sessões ou respostas fictícias do TESTE.
-- Criar/configurar outro projeto Vercel, com Production Branch `main`, credenciais exclusivas e `AMBIENTE=original`. Definir `SUPABASE_URL` e `SUPABASE_ORIGINAL_URL_ESPERADA` com a mesma URL ORIGINAL, diferente do TESTE. Não atribuir valores ORIGINAL a Preview ou Development.
+- Criar/configurar outro projeto Vercel, com Production Branch `main`, credenciais exclusivas e `AMBIENTE=original`. Definir `SUPABASE_URL` e `SUPABASE_ORIGINAL_URL_ESPERADA` com a mesma URL ORIGINAL `https://swbwbkslcotoecjlbqxe.supabase.co`, diferente do TESTE. Não atribuir valores ORIGINAL a Preview ou Development.
 - O servidor rejeita ORIGINAL em previews e em branches diferentes de `main`. Essas verificações complementam a separação de projetos e credenciais; não substituem a revisão das configurações de implantação.
 - Recriar o gestor real no Auth ORIGINAL e cadastrar seu UID administrativamente. Cadastrar participantes reais somente pelo procedimento autorizado da pesquisa. Não copiar contas, senhas ou sessões do TESTE.
 - Autorizar o deploy ORIGINAL e executar os testes de aceitação com a equipe antes de liberar aos estudantes. Revisar prazos de coleta, acesso, consentimento e guarda dos dados conforme o protocolo da pesquisa.

@@ -16,6 +16,7 @@ npm run dev
 
 O servidor local usa a porta 3000 e publica somente a pasta `public` e as nove APIs. Sem as chaves, as páginas abrem, mas a configuração retorna HTTP 500 e o aplicativo bloqueia o acesso. Os testes usam dados sintéticos isolados e nunca acessam Supabase real.
 
+- [Estado da candidata e bloqueios externos](docs/ENTREGA_CANDIDATA.md)
 - [Passo a passo: VS Code e painel Vercel](docs/VS_CODE_VERCEL.md)
 - [Implantação e separação TESTE/ORIGINAL](docs/IMPLANTACAO.md)
 - [Inventário, regras e validação](docs/VALIDACAO.md)

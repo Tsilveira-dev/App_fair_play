@@ -1,26 +1,40 @@
-# Migrações sem dados de pesquisa
+# Migração incremental sem transportar dados
 
-Estes arquivos **não foram executados em Supabase externo**. A validação usa PostgreSQL embutido PGlite, com `auth.users` e papéis locais de teste. Não representa inspeção do esquema ou das permissões atualmente publicados no Supabase.
+TESTE: `jzxltkjxdefuptutpkfx`. ORIGINAL: `swbwbkslcotoecjlbqxe`.
 
-| Arquivo | Aplicação |
+O responsável informou que o TESTE já tem tabelas, RLS, registros fictícios e UNIQUEs, incluindo `sessoes_uma_ativa_por_participante` para **pendente e aprovada**. A RPC e os triggers da 002 ainda não existem. Essas características foram reproduzidas em PostgreSQL PGlite local; o esquema hospedado não pôde ser inspecionado nesta sessão, que não dispõe de acesso administrativo ao Supabase.
+
+**Não executar `001_schema.sql` no TESTE existente.** A baseline é exclusiva de banco vazio e não deve ser reaplicada depois da proteção 002, pois contém grants iniciais mais amplos.
+
+| Arquivo | Uso |
 | --- | --- |
-| `migrations/001_schema.sql` | Projeto Supabase vazio. Cria as sete tabelas esperadas, restrições, referências e RLS. Recusa base existente sem a versão 001 registrada. Não cadastra participantes, gestores ou período de coleta. |
-| `migrations/002_protecao.sql` | Após a baseline, ou em base existente compatível após comparação. Cria unicidade, RPC de tentativas, proteções transacionais e visão de pontuação; restringe acesso direto às tabelas. |
+| `inspecionar_esquema.sql` | Consultas somente de metadados para comparar o contrato; não consulta participantes ou respostas. |
+| `migrations/001_schema.sql` | Baseline sem seeds, somente para projeto vazio e após revisão. |
+| `migrations/002_protecao.sql` | Instalação incremental, atômica e repetível das proteções em esquema compatível. |
+| `reverter_002.sql` | Reversão seletiva da nova 002, mantendo todas as linhas e tabelas de pesquisa. |
 
-Ambos usam transações e podem ser reaplicados após instalação bem-sucedida. Falhas devem causar rollback, sem apagar ou corrigir dados automaticamente. Os testes confirmam que a baseline interrompe em banco preexistente sem alterar seus registros.
+## Aplicar somente ao TESTE após verificar o esquema
 
-O arquivo [inspecionar_esquema.sql](inspecionar_esquema.sql) reúne consultas somente de metadados para auxiliar a comparação no SQL Editor de TESTE. Não consulta registros da pesquisa.
+1. Confirme no painel/API a referência `jzxltkjxdefuptutpkfx`. Preserve um backup administrativo e execute o relatório de metadados. Compare colunas, defaults, tipos, UNIQUEs, índices parciais, policies, grants de tabela/coluna e triggers. O token da Management API, se utilizado, deve ser fornecido nas configurações seguras, nunca no chat ou no Git.
+2. A 002 verifica as colunas necessárias e recusa objetos de proteção preexistentes sem o backup da migração. Caso uma versão antiga da 002 já tenha sido instalada, pare para revisão: não apague funções ou triggers para contornar essa verificação.
+3. Execute o arquivo completo em uma janela de manutenção. A transação tem limite de espera por locks e usa bloqueio para evitar aplicação/reversão simultânea. Se qualquer verificação falhar, reverta a transação; não remova registros para fazê-la passar.
+4. A migração reconhece UNIQUEs equivalentes mesmo com outros nomes ou ordem de colunas. Preserva o índice que cobre pendentes e aprovadas. Se uma unicidade necessária estiver ausente, cria apenas o índice faltante e registra seu nome para reversão; duplicidades causam rollback, sem correção automática dos dados. Predicados desconhecidos no índice esperado exigem revisão.
+5. As únicas gravações de instalação são metadados nas tabelas privadas `fairplay_schema_migrations` e `fairplay_migration_002_backup`. Não altera respostas, nomes, sessões ou desafios existentes, inclusive históricos expirados. A tabela de backup guarda apenas permissões, estado da migração e identificadores de objetos novos; não contém chaves ou dados dos estudantes e não é acessível pelas roles da aplicação.
+6. RLS permanece ativo e grants diretos de `anon`, `authenticated` e `public`, inclusive grants por coluna, são removidos das tabelas da pesquisa. Policies preexistentes não são excluídas. A `service_role` recebe somente as operações da API: leitura de gestores/período, cadastro/edição de participantes e sessões, leitura/inserção de check-ins e leitura/inserção/atualização de desafios. Não recebe escrita em gestores/período, alteração de check-ins, acesso direto às tentativas ou ao backup.
+7. Confira a existência da RPC `registrar_tentativa_acesso(uuid)`, dos três triggers e da visão `fairplay_pontuacao`. Faça a aceitação com contas fictícias no domínio Vercel TESTE antes de avançar ao ORIGINAL.
 
-## Procedimento de revisão
+A RPC limita tentativas a 30 segundos entre solicitações, dez por UID/hora e 300 por hora no total, serializando a verificação no banco. Gera o UUID explicitamente, portanto não depende de um default na tabela existente. Não há limpeza automática das tentativas.
 
-1. Confirme o projeto pelo painel e a URL. TESTE é `jzxltkjxdefuptutpkfx`. O ORIGINAL deve ter outra referência. Não execute comandos recebidos nesta entrega no ORIGINAL sem aprovação específica.
-2. Faça backup e obtenha **somente o esquema**, com ferramentas administrativas confiáveis. Compare colunas, tipos, defaults, índices, triggers, grants e policies com os arquivos. Não exporte respostas, nomes, tokens ou dados do Auth para o repositório.
-3. Para projeto vazio, revise e execute `001`, depois `002`, no SQL Editor como administrador. Para projeto já utilizado, não rode `001`: compare o esquema, investigue diferenças e prepare ajustes aditivos antes de executar `002`. A entrega não presume compatibilidade com um esquema externo não inspecionado.
-4. Índices únicos podem recusar duplicidades antigas. Resolva-as por procedimento aprovado pela equipe, preservando registros; a migração não contém `DELETE`, `TRUNCATE`, importação de fixtures ou atualização das respostas existentes.
-5. `002` revoga acesso direto das roles `anon`, `authenticated` e `public` às tabelas da pesquisa. O gestor continua operando pelas APIs. A role `service_role` recebe somente os acessos usados no servidor; as funções auxiliares de trigger não ficam disponíveis como RPC pública.
-6. Confira que Auth contém o campo `is_anonymous` e `raw_app_meta_data`, como no Supabase atual. Habilite login anônimo e por e-mail; registre um gestor real por administração segura e configure a data oficial da coleta separadamente. Não há seeds de pessoas ou contas nesta pasta.
-7. Execute a validação de aceitação no TESTE antes de solicitar aprovação do ORIGINAL. Inspecione também grants/policies de outros objetos preexistentes não abrangidos por estas migrações.
+Os triggers verificam participante ativo, sessão aprovada/não expirada e período na mesma transação da gravação. Check-ins são definitivos. O Dia 8 só permite recuperar o check-in do Dia 7; desafios não podem ser iniciados ou concluídos nesse dia. A pontuação é derivada dos registros: dez pontos por check-in e vinte por desafio concluído.
 
-A RPC de tentativas usa bloqueio transacional: 30 segundos por UID, dez por hora/UID e 300 por hora no total. Não há limpeza automática das tentativas. A equipe deve definir retenção conforme o protocolo; isso não autoriza excluir registros.
+## Reverter sem apagar os dados
 
-Os triggers validam participante ativo, sessão aprovada/não expirada, período e dia no momento da gravação. O check-in do Dia 7 pode ser recuperado no Dia 8. Desafios não são iniciados nem concluídos no Dia 8. A chave de unicidade é participante/dia, inclusive para dispositivos diferentes. A visão `fairplay_pontuacao` deriva dez pontos por check-in e vinte por desafio concluído.
+Execute `reverter_002.sql` apenas no mesmo banco e em janela de manutenção, após conferir o estado `aplicada` em `fairplay_migration_002_backup`. A reversão detecta mudanças nas definições das funções, triggers e visão, e nos grants de tabela/coluna após a instalação; nesses casos, interrompe para revisão em vez de sobrescrever alterações.
+
+Remove somente as funções, triggers, visão e eventuais índices criados por essa instalação. Restaura os grants e estados de RLS anteriores. Preserva os índices preexistentes, as tabelas de pesquisa e todas as linhas. As tabelas privadas de metadados permanecem e registram o estado `revertida`; não há exclusão de registros de controle. É possível reaplicar a nova 002 após essa reversão.
+
+A reversão também restaura as permissões antigas, que podem ser mais amplas; suspenda o uso do aplicativo até revisar a situação. A RPC fica indisponível até a reaplicação, portanto novas solicitações devem falhar de forma segura. Não use rollback da hospedagem como substituto da revisão do banco.
+
+## ORIGINAL
+
+Não foi consultado nem modificado nesta sessão. Compare seu esquema real antes de escolher entre baseline e migração incremental. Não copie participantes, contas Auth, sessões, respostas, desafios, tentativas ou backups do TESTE. A execução no ORIGINAL, a integração à `main` e sua publicação continuam dependendo da validação final do responsável.
