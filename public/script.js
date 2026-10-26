@@ -35,7 +35,7 @@ const MSG_DIA8 =
 const MSG_UM_POR_DIA =
   'Você já tem um desafio registrado para este dia do teste. Só é possível um desafio por dia.';
 const MSG_SEM_CONFIRMACAO =
-  'Sem confirmação do servidor agora. Novos registros serão liberados quando a conexão for confirmada.';
+  'Não foi possível verificar seu acesso agora. Você poderá continuar assim que a conexão for restabelecida.';
 const MSG_ESPERA_FALHA =
   'Não foi possível confirmar agora. Tentaremos novamente.';
 const TITULOS_BLOQUEIO = {
@@ -1144,7 +1144,7 @@ async function carregarCheckinsServidor() {
   const dados = await resposta.json();
   if (!Array.isArray(dados.checkins)) {
     throw new Error(
-      'Resposta inválida do servidor.'
+      'Não foi possível verificar seus check-ins. Atualize a página.'
     );
   }
   if (
@@ -1340,7 +1340,7 @@ function abrirApp() {
     checkinsSincronizados = false;
     atualizarBloqueios();
     toast(
-      'Não foi possível sincronizar os check-ins. Tente novamente ou atualize a página.'
+      'Não foi possível verificar seus check-ins. Tente novamente ou atualize a página.'
     );
   });
 
@@ -1348,7 +1348,7 @@ function abrirApp() {
     carregarDesafiosServidor().catch(() => {
       desafiosSincronizados = false;
       atualizarBloqueios();
-      toast('Não foi possível sincronizar os desafios. Atualize a página.');
+      toast('Não foi possível verificar seus desafios. Atualize a página.');
     });
   }
 }
@@ -1616,7 +1616,7 @@ function estadoCheckin() {
     return {
       tipo: 'sem_confirmacao',
       texto:
-        'Confirmando os check-ins salvos no Supabase. Aguarde ou atualize a página.'
+        'Verificando seus registros... Aguarde ou atualize a página.'
     };
   }
   const dia = diaDoTeste();
@@ -1877,7 +1877,7 @@ $('seeResult').addEventListener('click', async () => {
     const dados = await resposta.json();
     if (!dados.checkin) {
       throw new Error(
-        'Servidor não confirmou o registro.'
+        'Não foi possível confirmar seu check-in.'
       );
     }
     aplicarCheckinRemoto(dados.checkin);
@@ -1887,7 +1887,7 @@ $('seeResult').addEventListener('click', async () => {
     abrirResultado(estado.alvo);
   } catch (erro) {
     $('quizErr').textContent =
-      `Não conseguimos confirmar a gravação. Suas respostas continuam preenchidas. ${erro.message || 'Tente novamente.'}`;
+      `Não conseguimos confirmar seu check-in. Suas respostas continuam preenchidas. ${erro.message || 'Tente novamente.'}`;
   } finally {
     enviandoCheckin = false;
     $('seeResult').disabled = false;
@@ -1942,7 +1942,7 @@ async function requisitarDesafio(acao = null) {
         cache: 'no-store'
       });
     } catch {
-      throw new Error('Sem conexão com o servidor de desafios.');
+      throw new Error('Não foi possível carregar seus desafios. Verifique sua internet e tente novamente.');
     }
   }
 
@@ -2017,7 +2017,7 @@ async function carregarDesafiosServidor() {
   const promessa = (async () => {
     const dados = await requisitarDesafio();
     if (!Array.isArray(dados.desafios)) {
-      throw new Error('Resposta inválida do servidor de desafios.');
+      throw new Error('Não foi possível verificar seus desafios. Atualize a página.');
     }
     if (atual !== requisicaoDesafios || usuario !== uidAtual) return;
 
@@ -2123,7 +2123,7 @@ function atualizarBotoesTimer() {
     : 0;
   $('pause').textContent = running
     ? 'PAUSAR'
-    : desafio?.timerIniciado ? 'RETOMAR' : 'INICIAR CRONÔMETRO';
+    : desafio?.timerIniciado ? 'RETOMAR' : 'INICIAR';
   $('pause').disabled =
     !desafio ||
     !coletaLiberada() ||
@@ -2248,13 +2248,13 @@ async function concluirDesafio() {
     const dados = await requisitarDesafio('concluir');
     if (dados?.desafio?.status !== 'concluido' ||
         !aplicarDesafioRemoto(dados.desafio)) {
-      throw new Error('O servidor não confirmou a conclusão.');
+      throw new Error('Não foi possível confirmar a conclusão do desafio.');
     }
     desafiosSincronizados = true;
     const estatistica = estatisticas();
     toast(estatistica.concluidos % 3 === 0
-      ? 'Desafio confirmado no Supabase! +20 pontos e nova medalha!'
-      : 'Desafio confirmado no Supabase! +20 pontos');
+      ? 'Desafio concluído! Você ganhou 20 pontos e uma nova medalha.'
+      : 'Desafio concluído! Você ganhou 20 pontos.');
     setTimeout(() => {
       if (telaAtual === 'app') go('progress');
     }, 1200);
@@ -2263,7 +2263,7 @@ async function concluirDesafio() {
     try {
       await carregarDesafiosServidor();
       if (desafiosDoDia(dia)[0]?.status === 'concluido') {
-        toast('Conclusão confirmada no Supabase! +20 pontos.');
+        toast('Desafio concluído! Você ganhou 20 pontos.');
         if (telaAtual === 'app') go('progress');
         return;
       }
@@ -2303,11 +2303,11 @@ function renderChallenge() {
   } else if (!acessoConfirmado) {
     aviso = MSG_SEM_CONFIRMACAO;
   } else if (!desafiosSincronizados || !checkinsSincronizados) {
-    aviso = 'Confirmando os registros no Supabase. Aguarde ou atualize a página.';
+    aviso = 'Verificando seus registros... Aguarde ou atualize a página.';
   } else if (enviandoDesafio) {
-    aviso = 'Salvando seu desafio no Supabase...';
+    aviso = 'Salvando seu desafio...';
   } else if (!desafio && existente?.status === 'concluido') {
-    aviso = 'Desafio concluído e confirmado no Supabase. Você recebeu 20 pontos.';
+    aviso = 'Desafio concluído! Você ganhou 20 pontos.';
   } else if (!desafio && existente) {
     aviso = MSG_UM_POR_DIA;
   }
@@ -2340,7 +2340,7 @@ $('accept').addEventListener('click', async () => {
     return;
   }
   if (!desafiosSincronizados || !checkinsSincronizados) {
-    toast('Confirme primeiro a sincronização com o Supabase.');
+    toast('Aguarde a verificação dos seus registros antes de continuar.');
     return;
   }
   const dia = diaDoTeste();
@@ -2363,7 +2363,7 @@ $('accept').addEventListener('click', async () => {
     const dados = await requisitarDesafio('aceitar');
     if (dados?.desafio?.status !== 'aceito' ||
         !aplicarDesafioRemoto(dados.desafio)) {
-      throw new Error('O servidor não confirmou o desafio.');
+      throw new Error('Não foi possível confirmar seu desafio.');
     }
     desafiosSincronizados = true;
     toast('Desafio aceito e salvo! O cronômetro é opcional.');
@@ -2375,7 +2375,7 @@ $('accept').addEventListener('click', async () => {
       desafiosSincronizados = false;
     }
     if (desafiosDoDia(dia)[0]?.origem === 'supabase') {
-      toast('Seu desafio já está registrado no Supabase.');
+      toast('Seu desafio já foi registrado.');
     } else {
       toast(erro.message || 'Não foi possível salvar o desafio.');
     }
@@ -2515,17 +2515,17 @@ function renderProgress() {
     } para desbloquear uma nova medalha.`;
   $('nextBar').style.width = '0';
   let nota =
-    'Check-ins confirmados: 10 pontos cada. Desafios concluídos e confirmados: 20 pontos cada. Máximo de 210 pontos em sete dias. Ambos são registrados no Supabase; o cronômetro é opcional.';
+    'Cada check-in confirmado vale 10 pontos e cada desafio concluído vale 20 pontos. Você pode conquistar até 210 pontos nos sete dias. O cronômetro é opcional.';
   if (!inicio) {
     nota +=
       ' A data oficial do teste ainda não foi definida.';
   }
   if (!acessoConfirmado) {
     nota +=
-      ' Sem confirmação do servidor agora, novos registros estão bloqueados.';
+      ' Não foi possível verificar seu acesso agora. Aguarde para fazer novos registros.';
   }
   if (!desafiosSincronizados && coletaLiberada()) {
-    nota += ' Aguardando sincronização dos desafios: a pontuação exibida pode estar incompleta.';
+    nota += ' Estamos verificando seus desafios. A pontuação exibida pode estar incompleta.';
   }
   $('progressoNota').textContent = nota;
   requestAnimationFrame(() => {

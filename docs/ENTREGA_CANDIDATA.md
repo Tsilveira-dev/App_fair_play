@@ -18,7 +18,7 @@ Código na branch `teste-supabase`; PR #1 permanece em rascunho. Não representa
 
 O responsável confirmou a 002 **já aplicada** no TESTE, com RPC, três triggers, visão, registros preservados, um gestor e uma sessão aprovada ativa. Não reaplicar a migração, não recriar o projeto e não solicitar credenciais novamente.
 
-A etapa seguinte executou nove cenários reais em Chromium no aplicativo publicado: formulário, catálogo 7×5, solicitação fictícia 202, limite de reenvio 429, bloqueios de autorização e restauração da mesma sessão após recarga. O login válido de gestor e o fluxo positivo com gravação/pontuação continuam não executados nesta ferramenta. A correção de ACL de `rls_auto_enable()` foi preparada, sem aplicação hospedada. Evidências e limites completos em [Aceitação publicada](ACEITACAO_PUBLICADA.md).
+A etapa seguinte executou nove cenários reais em Chromium no aplicativo publicado: formulário, catálogo 7×5, solicitação fictícia 202, limite de reenvio 429, bloqueios de autorização e restauração da mesma sessão após recarga. O login válido de gestor continua não executado nesta ferramenta. Posteriormente, o responsável confirmou a aceitação positiva de `Experimento`: cinco respostas no Dia 2, 8/10, nível alto, `D02_ALTO_ETAPAS` concluído e 30 pontos na visão do TESTE. A evidência foi recebida do ChatGPT administrativo e não repetida nesta sessão. A correção de ACL de `rls_auto_enable()` foi preparada, sem aplicação hospedada. Evidências e limites completos em [Aceitação publicada](ACEITACAO_PUBLICADA.md).
 
 A comparação administrativa dos metadados ORIGINAL não foi executada nesta sessão. A main e o ORIGINAL permanecem sem alterações.
 
@@ -38,6 +38,6 @@ Ainda não foi definido um prazo institucional de retenção, um procedimento de
 
 ## Pendências finais
 
-1. Concluir o fluxo positivo usando a sessão de gestor e o estudante fictício já aprovados: cadastro/solicitação/aprovação, cinco respostas, check-in, desafio, pontuação e recarga.
+1. Completar as evidências ainda ausentes de login válido do gestor, solicitação/aprovação e restauração dos registros autorizados após recarga. Check-in, classificação, desafio e 30 pontos de `Experimento` já foram confirmados pelo responsável; não repetir gravações para comprovar o que já foi validado. Revisar o título de desafio que ultrapassa a área interna em 320/375 px, sem substituir seu texto aprovado.
 2. Pela integração administrativa já autorizada, conferir metadados/ACL de `rls_auto_enable()` e avaliar a correção pontual, sem reaplicar 002; comparar exclusivamente metadados do ORIGINAL.
 3. Validar textos, datas, consentimento, retenção e a aceitação final antes de decidir sobre main e publicação ORIGINAL. Não transferir dados do TESTE.

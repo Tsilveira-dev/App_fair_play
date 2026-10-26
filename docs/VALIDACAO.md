@@ -43,15 +43,15 @@ Todas têm entradas `/api/<nome>` e compatibilidade `/.netlify/functions/<nome>`
 
 `npm run check` passou com **119 testes, zero falhas e zero ignorados**, na última execução. O comando executa validação de sintaxe/build e a suíte Node. A suíte cobre APIs com Supabase simulado, interface real em DOM JSDOM (incluindo envio das cinco respostas, desafio, 30 pontos e restauração em outra página), servidor HTTP real e PostgreSQL PGlite com execução das migrações, grants, triggers, índices, RPC e visão de pontuação.
 
-Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegador gráfico: layout responsivo, renderização de fontes/CDNs e teste em celular ainda exigem aceitação no ambiente TESTE publicado. O esquema SQL externo não foi inspecionado, pois não há acesso administrativo nesta sessão. As verificações reais públicas e com identidade anônima estão registradas na entrega candidata. Nenhuma conexão, execução SQL ou publicação ORIGINAL faz parte da validação realizada.
+Esses testes não conectam Vercel ou Supabase hospedados. JSDOM não é navegador gráfico. A revisão de mensagens acrescenta inspeção em Chromium nas larguras 320, 375, 390, 768 e 1280 px com estados fictícios em memória, sem gravações; não equivale a teste em aparelho físico ou aceitação autenticada. A pendência de layout e o resultado funcional de `Experimento` informado pelo responsável estão em [Aceitação publicada](ACEITACAO_PUBLICADA.md). O esquema SQL externo não foi inspecionado, pois não há acesso administrativo nesta sessão. As verificações reais públicas e com identidade anônima estão registradas na entrega candidata. Nenhuma conexão, execução SQL ou publicação ORIGINAL faz parte da validação realizada.
 
 ## Pendências de implantação
 
-1. Cadastrar as chaves exclusivamente de TESTE nas configurações seguras do ambiente/projeto. URL e referência de TESTE já são conhecidas; não enviar segredos pelo chat.
-2. Comparar o esquema Supabase de TESTE com as migrações e instalar a RPC/proteções compatíveis, sem excluir registros.
-3. Autorizar conexão ao projeto Vercel de TESTE e validar login, autorização, persistência e recarga no domínio publicado e em celular.
-4. Confirmar com o responsável os textos que o código identifica como rascunho/proposta antes da coleta.
-5. Aprovar separadamente PR/integração à `main`, migrações no ORIGINAL e publicação ORIGINAL, nessa ordem.
+1. O Vercel TESTE já está conectado e configurado; a 002 já foi aplicada pela integração administrativa. Não reaplicar 001/002, recriar projetos ou solicitar novamente credenciais.
+2. Completar somente as evidências de aceitação ainda ausentes (gestor, aprovação e recarga de registros), sem repetir o fluxo de `Experimento` já confirmado pelo responsável.
+3. Revisar o layout do título aprovado de desafio em telas estreitas; os novos textos da interface foram conferidos com emulação de largura.
+4. Conferir ACL/metadados pela integração administrativa já autorizada e validar catálogo, datas, consentimento e retenção com o responsável antes da coleta.
+5. Aprovar separadamente PR/integração à `main`, eventuais ajustes no ORIGINAL e publicação ORIGINAL. Não transportar dados do TESTE.
 
 O projeto também inclui tarefas VS Code (preparação, testes, F5 e conferência do deploy), criação idempotente de `.env.local`, validação de configuração TESTE e conferência HTTP sem credenciais. O relatório SQL de esquema é somente leitura. Esses recursos não executam migração remota ou deploy automaticamente.
 
