@@ -25,7 +25,7 @@ const FUSO = 'America/Fortaleza';
 const DIAS_DO_TESTE = 7;
 const TIPO_DISPOSITIVO_PADRAO = 'individual';
 const MSG_SEM_REGISTRO =
-  'Ainda não há uma solicitação registrada para este nome. Confira o nome com a equipe e tente novamente. Se você já enviou uma solicitação antes, procure o gestor.';
+  'Este navegador ainda não tem um acesso vinculado. Se você já recebeu aprovação, abra o Fair Play no mesmo navegador usado para solicitar acesso. Se trocou de navegador ou aparelho, procure a equipe para liberar um novo acesso. Confira também seu primeiro nome.';
 const MSG_CHECKIN_BLOQUEADO =
   'Os check-ins ainda não estão liberados.';
 const MSG_DESAFIO_BLOQUEADO =
@@ -1666,6 +1666,15 @@ function estadoCheckin() {
 }
 function renderCheckin() {
   const estado = estadoCheckin();
+  const dia = diaDoTeste();
+  const rotuloDia = $('checkinDiaAtual');
+  if (dia >= 1 && dia <= DIAS_DO_TESTE) {
+    rotuloDia.textContent = `Dia ${dia} de ${DIAS_DO_TESTE} • ${formatarDataCurta(hojeFortaleza())}`;
+    rotuloDia.classList.remove('hidden');
+  } else {
+    rotuloDia.textContent = '';
+    rotuloDia.classList.add('hidden');
+  }
   const caixa = $('checkinBloqueio');
   const bloqueado =
     estado.tipo === 'bloqueado' ||
