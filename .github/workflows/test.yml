@@ -1,7 +1,7 @@
 name: Validar Fair Play
 on:
   push:
-    branches: [teste-supabase]
+    branches: [main, teste-supabase]
   pull_request:
 permissions:
   contents: read
